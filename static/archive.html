@@ -173,7 +173,10 @@ let transcripts = []
 async function init() {
   const config = await fetch('/config').then(r => r.json())
   const { createClient } = supabase
-  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
+  const rememberMe = localStorage.getItem('remember_me') !== 'false'
+  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key, {
+    auth: { storage: rememberMe ? localStorage : sessionStorage, persistSession: true }
+  })
 
   const { data: { session } } = await supabaseClient.auth.getSession()
   if (!session) { window.location.href = '/login'; return }

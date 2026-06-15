@@ -316,8 +316,9 @@
 <nav>
   <a href="/" class="nav-logo">Transkript Aracı</a>
   <span class="nav-email" id="nav-email"></span>
-  <a href="/archive" class="nav-link">Arşiv</a>
-  <button class="nav-btn" id="logout-btn">Çıkış</button>
+  <a href="/archive" class="nav-link" id="nav-archive" style="display:none">Arşiv</a>
+  <button class="nav-btn" id="logout-btn" style="display:none">Çıkış</button>
+  <a href="/login" class="nav-link" id="nav-login" style="display:none">Giriş Yap</a>
 </nav>
 
 <header>
@@ -408,12 +409,21 @@ let currentSession = null
 async function initAuth() {
   const config = await fetch('/config').then(r => r.json())
   const { createClient } = supabase
-  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
+  const rememberMe = localStorage.getItem('remember_me') !== 'false'
+  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key, {
+    auth: { storage: rememberMe ? localStorage : sessionStorage, persistSession: true }
+  })
 
   const { data: { session } } = await supabaseClient.auth.getSession()
-  if (!session) { window.location.href = '/login'; return }
-  currentSession = session
-  document.getElementById('nav-email').textContent = session.user.email
+  if (session) {
+    currentSession = session
+    const username = session.user.user_metadata?.username || session.user.email
+    document.getElementById('nav-email').textContent = username
+    document.getElementById('nav-archive').style.display = ''
+    document.getElementById('logout-btn').style.display = ''
+  } else {
+    document.getElementById('nav-login').style.display = ''
+  }
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {

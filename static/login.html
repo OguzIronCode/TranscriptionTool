@@ -9,12 +9,10 @@
   :root {
     --bg: #0d0d0f;
     --surface: #18181b;
+    --surface2: #27272a;
     --border: #3f3f46;
     --primary: #6366f1;
     --primary-hover: #4f46e5;
-    --primary-dim: #6366f120;
-    --success: #22c55e;
-    --danger: #ef4444;
     --text: #f4f4f5;
     --text-muted: #a1a1aa;
     --radius: 12px;
@@ -27,88 +25,193 @@
     font-family: system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 1rem;
+    gap: 1rem;
   }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 2.5rem 2rem;
-    width: 100%;
-    max-width: 400px;
-  }
-  .logo {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
+  .logo { text-align: center; margin-bottom: 0.5rem; }
   .logo h1 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 700;
     background: linear-gradient(135deg, #6366f1, #a78bfa);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  .logo p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.4rem; }
-  label {
+  .logo p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  /* Sekmeler */
+  .tabs {
+    display: flex;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    margin-bottom: 1.75rem;
+  }
+  .tab {
+    flex: 1;
+    padding: 0.55rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: calc(var(--radius-sm) - 2px);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    border: none;
+    background: none;
+  }
+  .tab.active { background: var(--surface); color: var(--text); }
+
+  /* Form elemanları */
+  .field { margin-bottom: 1rem; }
+  .field label {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
   }
-  input[type="email"] {
+  .field input {
     width: 100%;
-    background: #27272a;
+    background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text);
-    padding: 0.7rem 0.9rem;
+    padding: 0.65rem 0.85rem;
     font-size: 0.95rem;
     outline: none;
-    margin-bottom: 1rem;
   }
-  input[type="email"]:focus { border-color: var(--primary); }
-  button {
+  .field input:focus { border-color: var(--primary); }
+
+  /* Beni tanı */
+  .remember-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .remember-row input[type="checkbox"] { display: none; }
+  .custom-check {
+    width: 17px; height: 17px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .remember-row input:checked + .custom-check { background: var(--primary); border-color: var(--primary); }
+  .remember-row input:checked + .custom-check::after { content: '✓'; font-size: 10px; color: white; font-weight: 700; }
+  .remember-label { font-size: 0.85rem; color: var(--text-muted); }
+
+  .btn {
     width: 100%;
-    padding: 0.85rem;
+    padding: 0.8rem;
     background: var(--primary);
     color: white;
     border: none;
     border-radius: var(--radius-sm);
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.15s;
   }
-  button:hover:not(:disabled) { background: var(--primary-hover); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
   .message {
-    margin-top: 1rem;
-    padding: 0.75rem 1rem;
+    margin-top: 0.875rem;
+    padding: 0.7rem 0.9rem;
     border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     display: none;
   }
   .message.success { background: #22c55e20; color: #86efac; border: 1px solid #22c55e40; }
-  .message.error { background: #ef444420; color: #fca5a5; border: 1px solid #ef444440; }
+  .message.error   { background: #ef444420; color: #fca5a5; border: 1px solid #ef444440; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Kayıtsız devam */
+  .guest-btn {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .guest-btn:hover { color: var(--text); }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">
-    <h1>Video Transkript Aracı</h1>
-    <p>Devam etmek için e-posta adresinizi girin</p>
-  </div>
-  <label for="email">E-posta</label>
-  <input type="email" id="email" placeholder="ornek@mail.com" autocomplete="email">
-  <button id="send-btn">Giriş Linki Gönder</button>
-  <div class="message" id="message"></div>
+
+<div class="logo">
+  <h1>Video Transkript Aracı</h1>
+  <p>Kişisel arşivinize erişmek için giriş yapın</p>
 </div>
+
+<div class="card">
+  <div class="tabs">
+    <button class="tab active" id="tab-login" onclick="switchTab('login')">Giriş Yap</button>
+    <button class="tab" id="tab-register" onclick="switchTab('register')">Kayıt Ol</button>
+  </div>
+
+  <!-- Giriş -->
+  <div class="panel active" id="panel-login">
+    <div class="field">
+      <label>E-posta</label>
+      <input type="email" id="login-email" placeholder="ornek@mail.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Şifre</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <label class="remember-row" for="remember-check">
+      <input type="checkbox" id="remember-check" checked>
+      <span class="custom-check"></span>
+      <span class="remember-label">Beni tanı</span>
+    </label>
+    <button class="btn" id="login-btn">Giriş Yap</button>
+    <div class="message" id="login-msg"></div>
+  </div>
+
+  <!-- Kayıt -->
+  <div class="panel" id="panel-register">
+    <div class="field">
+      <label>Kullanıcı Adı</label>
+      <input type="text" id="reg-username" placeholder="kullaniciadi" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>E-posta</label>
+      <input type="email" id="reg-email" placeholder="ornek@mail.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Şifre</label>
+      <input type="password" id="reg-password" placeholder="En az 6 karakter" autocomplete="new-password">
+    </div>
+    <button class="btn" id="register-btn">Kayıt Ol</button>
+    <div class="message" id="register-msg"></div>
+  </div>
+</div>
+
+<button class="guest-btn" onclick="window.location.href='/'">Kayıtsız devam et →</button>
 
 <script>
 let supabaseClient = null
@@ -118,48 +221,92 @@ async function init() {
   const { createClient } = supabase
   supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
 
-  // Zaten oturum varsa ana sayfaya yönlendir
   const { data: { session } } = await supabaseClient.auth.getSession()
-  if (session) {
-    window.location.href = '/'
-    return
-  }
+  if (session) { window.location.href = '/'; return }
 }
 
-const sendBtn = document.getElementById('send-btn')
-const emailInput = document.getElementById('email')
-const message = document.getElementById('message')
-
-function showMessage(text, type) {
-  message.textContent = text
-  message.className = `message ${type}`
-  message.style.display = 'block'
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+  document.getElementById(`tab-${tab}`).classList.add('active')
+  document.getElementById(`panel-${tab}`).classList.add('active')
 }
 
-sendBtn.addEventListener('click', async () => {
-  const email = emailInput.value.trim()
-  if (!email) return
+function showMsg(id, text, type) {
+  const el = document.getElementById(id)
+  el.textContent = text
+  el.className = `message ${type}`
+  el.style.display = 'block'
+}
 
-  sendBtn.disabled = true
-  sendBtn.textContent = 'Gönderiliyor...'
+// Giriş
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim()
+  const password = document.getElementById('login-password').value
+  if (!email || !password) return
 
-  const { error } = await supabaseClient.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin + '/' }
-  })
+  const rememberMe = document.getElementById('remember-check').checked
+  localStorage.setItem('remember_me', rememberMe ? 'true' : 'false')
+
+  const btn = document.getElementById('login-btn')
+  btn.disabled = true
+  btn.textContent = 'Giriş yapılıyor...'
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password })
 
   if (error) {
-    showMessage('Hata: ' + error.message, 'error')
-    sendBtn.disabled = false
-    sendBtn.textContent = 'Giriş Linki Gönder'
+    showMsg('login-msg', 'E-posta veya şifre hatalı.', 'error')
+    btn.disabled = false
+    btn.textContent = 'Giriş Yap'
   } else {
-    showMessage('Link gönderildi! E-postanızı kontrol edin.', 'success')
-    sendBtn.textContent = 'Gönderildi'
+    window.location.href = '/'
   }
 })
 
-emailInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') sendBtn.click()
+// Kayıt
+document.getElementById('register-btn').addEventListener('click', async () => {
+  const username = document.getElementById('reg-username').value.trim()
+  const email = document.getElementById('reg-email').value.trim()
+  const password = document.getElementById('reg-password').value
+
+  if (!username || !email || !password) {
+    showMsg('register-msg', 'Tüm alanları doldurun.', 'error')
+    return
+  }
+  if (password.length < 6) {
+    showMsg('register-msg', 'Şifre en az 6 karakter olmalı.', 'error')
+    return
+  }
+
+  const btn = document.getElementById('register-btn')
+  btn.disabled = true
+  btn.textContent = 'Kayıt olunuyor...'
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: { data: { username } }
+  })
+
+  if (error) {
+    showMsg('register-msg', error.message, 'error')
+    btn.disabled = false
+    btn.textContent = 'Kayıt Ol'
+  } else if (data.session) {
+    window.location.href = '/'
+  } else {
+    showMsg('register-msg', 'E-postanızı doğrulayın, ardından giriş yapabilirsiniz.', 'success')
+    btn.disabled = false
+    btn.textContent = 'Kayıt Ol'
+  }
+})
+
+// Enter tuşu
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-btn').click()
+})
+document.getElementById('reg-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('register-btn').click()
 })
 
 init()
