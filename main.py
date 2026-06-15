@@ -55,16 +55,39 @@ async def get_user_id(request: Request) -> str | None:
 
 
 async def compress_to_mp3(input_path: str, output_path: str):
-    proc = await asyncio.create_subprocess_exec(
-        "ffmpeg", "-i", input_path,
-        "-ac", "1", "-b:a", "16k", "-ar", "16000", "-y",
-        output_path,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        raise HTTPException(500, f"FFmpeg hatası: {stderr.decode()}")
+    ext = os.path.splitext(input_path)[1].lower()
+
+    async def _run(extra: list[str]) -> tuple[int, bytes]:
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", *extra,
+            "-probesize", "200M",
+            "-analyzeduration", "200M",
+            "-i", input_path,
+            "-vn",
+            "-ac", "1", "-b:a", "16k", "-ar", "16000", "-y",
+            output_path,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        return proc.returncode, stderr
+
+    if ext in (".webm", ".weba"):
+        # Matroska is WebM's superset — more permissive demuxer handles streaming
+        # WebM (MediaRecorder output) and non-standard yt-dlp downloads.
+        # Fall back through three strategies before giving up.
+        for fmt in (["-f", "matroska"], ["-f", "webm"], []):
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+            code, stderr = await _run(fmt)
+            if code == 0:
+                return
+    else:
+        code, stderr = await _run([])
+        if code == 0:
+            return
+
+    raise HTTPException(500, f"FFmpeg hatası: {stderr.decode()}")
 
 
 @app.get("/config")
@@ -319,6 +342,11 @@ async def transcribe_url(body: UrlRequest, request: Request):
             "quiet": True,
             "no_warnings": True,
             "postprocessors": [],
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "ios", "tv_embedded"],
+                }
+            },
         }
 
         def download():

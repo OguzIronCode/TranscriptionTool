@@ -370,7 +370,7 @@ dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.
 document.getElementById('remove-btn').addEventListener('click', clearFile)
 
 // ── Mic ───────────────────────────────────────────────────
-let mediaRecorder = null, micChunks = [], micSec = 0, micInterval = null
+let mediaRecorder = null, micChunks = [], micSec = 0, micInterval = null, micMimeType = 'audio/webm'
 const micBtn   = document.getElementById('mic-btn')
 const micTimer = document.getElementById('mic-timer')
 const micHint  = document.getElementById('mic-hint')
@@ -388,11 +388,13 @@ micBtn.addEventListener('click', async () => {
       micTimer.textContent = '00:00'; micTimer.classList.add('on')
       micHint.textContent = 'Kayıt devam ediyor... durdurmak için tıkla'
       micBtn.classList.add('rec'); micBtn.innerHTML = STOP_SVG
-      mediaRecorder = new MediaRecorder(stream)
+      micMimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
+        .find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm'
+      mediaRecorder = new MediaRecorder(stream, { mimeType: micMimeType })
       mediaRecorder.ondataavailable = e => { if (e.data.size > 0) micChunks.push(e.data) }
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop())
-        micBlob = new Blob(micChunks, { type: 'audio/webm' })
+        micBlob = new Blob(micChunks, { type: micMimeType })
         micHint.textContent = `Kayıt hazır (${fmtMic(micSec)}) — transkript oluşturmak için butona bas`
         micTimer.classList.remove('on'); updateBtn()
       }
@@ -433,8 +435,9 @@ document.getElementById('transcribe-btn').addEventListener('click', async () => 
         body: JSON.stringify({ url, language: document.getElementById('lang-select').value })
       })
     } else {
+      const micExt = micMimeType.includes('ogg') ? '.ogg' : micMimeType.includes('mp4') ? '.m4a' : '.webm'
       const file = activeMode === 'mic'
-        ? new File([micBlob], 'kayit.webm', { type: 'audio/webm' })
+        ? new File([micBlob], 'kayit' + micExt, { type: micMimeType })
         : selectedFile
       statusText.textContent = activeMode === 'mic' ? 'Kayıt işleniyor...' : 'Dosya yükleniyor...'
       setTimeout(() => { statusText.textContent = 'Ses sıkıştırılıyor ve Groq API\'ye gönderiliyor...' }, 2000)
