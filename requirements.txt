@@ -3,3 +3,4 @@ uvicorn[standard]
 groq
 python-multipart
 python-dotenv
+supabase

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giriş — Video Transkript Aracı</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181b;
+    --border: #3f3f46;
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --primary-dim: #6366f120;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --text: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 400px;
+  }
+  .logo {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .logo h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .logo p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.4rem; }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
+  }
+  input[type="email"] {
+    width: 100%;
+    background: #27272a;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 0.7rem 0.9rem;
+    font-size: 0.95rem;
+    outline: none;
+    margin-bottom: 1rem;
+  }
+  input[type="email"]:focus { border-color: var(--primary); }
+  button {
+    width: 100%;
+    padding: 0.85rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover:not(:disabled) { background: var(--primary-hover); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .message {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    display: none;
+  }
+  .message.success { background: #22c55e20; color: #86efac; border: 1px solid #22c55e40; }
+  .message.error { background: #ef444420; color: #fca5a5; border: 1px solid #ef444440; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>Video Transkript Aracı</h1>
+    <p>Devam etmek için e-posta adresinizi girin</p>
+  </div>
+  <label for="email">E-posta</label>
+  <input type="email" id="email" placeholder="ornek@mail.com" autocomplete="email">
+  <button id="send-btn">Giriş Linki Gönder</button>
+  <div class="message" id="message"></div>
+</div>
+
+<script>
+let supabaseClient = null
+
+async function init() {
+  const config = await fetch('/config').then(r => r.json())
+  const { createClient } = supabase
+  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
+
+  // Zaten oturum varsa ana sayfaya yönlendir
+  const { data: { session } } = await supabaseClient.auth.getSession()
+  if (session) {
+    window.location.href = '/'
+    return
+  }
+}
+
+const sendBtn = document.getElementById('send-btn')
+const emailInput = document.getElementById('email')
+const message = document.getElementById('message')
+
+function showMessage(text, type) {
+  message.textContent = text
+  message.className = `message ${type}`
+  message.style.display = 'block'
+}
+
+sendBtn.addEventListener('click', async () => {
+  const email = emailInput.value.trim()
+  if (!email) return
+
+  sendBtn.disabled = true
+  sendBtn.textContent = 'Gönderiliyor...'
+
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + '/' }
+  })
+
+  if (error) {
+    showMessage('Hata: ' + error.message, 'error')
+    sendBtn.disabled = false
+    sendBtn.textContent = 'Giriş Linki Gönder'
+  } else {
+    showMessage('Link gönderildi! E-postanızı kontrol edin.', 'success')
+    sendBtn.textContent = 'Gönderildi'
+  }
+})
+
+emailInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendBtn.click()
+})
+
+init()
+</script>
+</body>
+</html>

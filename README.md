@@ -1,5 +1,9 @@
 # TranscriptionTool
 
+**Live demo:** [transcriptiontool.onrender.com](https://transcriptiontool.onrender.com)
+
+> **Note:** Hosted on Render's free tier. If the site hasn't been used recently, the first request may take **30–60 seconds** to wake up. This is normal — just wait and it will load.
+
 A web-based audio and video transcription tool powered by **Groq API (Whisper Large v3)**. Upload any media file, get accurate transcripts with timestamps — fast.
 
 ---

@@ -4,6 +4,57 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Video Transkript Aracı</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  nav {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0 1.25rem;
+  }
+  .nav-logo {
+    font-size: 0.9rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+  .nav-email {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+  }
+  .nav-link {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .nav-link:hover { color: var(--text); background: var(--border); }
+  .nav-btn {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    cursor: pointer;
+  }
+  .nav-btn:hover { color: var(--text); background: var(--border); }
+</style>
 <style>
   :root {
     --bg: #0d0d0f;
@@ -262,6 +313,13 @@
 </head>
 <body>
 
+<nav>
+  <a href="/" class="nav-logo">Transkript Aracı</a>
+  <span class="nav-email" id="nav-email"></span>
+  <a href="/archive" class="nav-link">Arşiv</a>
+  <button class="nav-btn" id="logout-btn">Çıkış</button>
+</nav>
+
 <header>
   <h1>Video Transkript Aracı</h1>
   <p>Yerel video veya ses dosyasından metin çıkar — Whisper ile, tarayıcıda çalışır</p>
@@ -344,6 +402,27 @@
 </div>
 
 <script>
+let supabaseClient = null
+let currentSession = null
+
+async function initAuth() {
+  const config = await fetch('/config').then(r => r.json())
+  const { createClient } = supabase
+  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
+
+  const { data: { session } } = await supabaseClient.auth.getSession()
+  if (!session) { window.location.href = '/login'; return }
+  currentSession = session
+  document.getElementById('nav-email').textContent = session.user.email
+}
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut()
+  window.location.href = '/login'
+})
+
+initAuth()
+
 const fileInput = document.getElementById('file-input');
 const dropzone = document.getElementById('dropzone');
 const fileInfo = document.getElementById('file-info');
@@ -441,7 +520,8 @@ transcribeBtn.addEventListener('click', async () => {
   try {
     setTimeout(() => { statusText.textContent = 'Ses sıkıştırılıyor ve Groq API\'ye gönderiliyor...'; }, 2000);
 
-    const res = await fetch('/transcribe', { method: 'POST', body: formData });
+    const headers = currentSession ? { 'Authorization': `Bearer ${currentSession.access_token}` } : {}
+    const res = await fetch('/transcribe', { method: 'POST', body: formData, headers });
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.detail || 'Sunucu hatası');

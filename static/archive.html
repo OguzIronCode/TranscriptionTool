@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arşiv — Video Transkript Aracı</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181b;
+    --surface2: #27272a;
+    --border: #3f3f46;
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --primary-dim: #6366f120;
+    --danger: #ef4444;
+    --text: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 1rem 4rem;
+  }
+  nav {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+  .nav-home {
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+  .nav-email {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+  }
+  .nav-btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .nav-btn:hover { background: var(--border); }
+
+  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; align-self: flex-start; width: 100%; max-width: 720px; }
+
+  .empty {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-top: 3rem;
+    text-align: center;
+  }
+
+  .transcript-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 1rem;
+  }
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .card-meta { flex: 1; min-width: 0; }
+  .card-filename {
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-info {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    background: var(--primary-dim);
+    color: #a5b4fc;
+    border: 1px solid #6366f140;
+  }
+  .date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .card-preview {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: var(--border); }
+  .btn-sm.danger { border-color: #ef444440; color: #fca5a5; }
+  .btn-sm.danger:hover { background: #ef444420; }
+
+  .loading { color: var(--text-muted); margin-top: 3rem; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-home">← Ana Sayfa</a>
+  <span class="nav-email" id="nav-email"></span>
+  <button class="nav-btn" id="logout-btn">Çıkış</button>
+</nav>
+
+<h1>Transkript Arşivi</h1>
+
+<div class="loading" id="loading">Yükleniyor...</div>
+<div class="empty" id="empty" style="display:none;">Henüz transkript yok. Ana sayfadan bir dosya yükleyin.</div>
+<div id="list"></div>
+
+<script>
+let supabaseClient = null
+let currentSession = null
+let transcripts = []
+
+async function init() {
+  const config = await fetch('/config').then(r => r.json())
+  const { createClient } = supabase
+  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
+
+  const { data: { session } } = await supabaseClient.auth.getSession()
+  if (!session) { window.location.href = '/login'; return }
+  currentSession = session
+  document.getElementById('nav-email').textContent = session.user.email
+
+  await loadTranscripts()
+}
+
+async function loadTranscripts() {
+  const res = await fetch('/transcripts', {
+    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+  })
+  transcripts = await res.json()
+  render()
+}
+
+function render() {
+  document.getElementById('loading').style.display = 'none'
+  if (!transcripts.length) {
+    document.getElementById('empty').style.display = 'block'
+    return
+  }
+  const list = document.getElementById('list')
+  list.innerHTML = transcripts.map(t => `
+    <div class="transcript-card" data-id="${t.id}">
+      <div class="card-header">
+        <div class="card-meta">
+          <div class="card-filename">${escapeHtml(t.filename)}</div>
+          <div class="card-info">
+            <span class="badge">${t.language.toUpperCase()}</span>
+            <span class="date">${formatDate(t.created_at)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-preview">${escapeHtml(t.text)}</div>
+      <div class="card-actions">
+        <button class="btn-sm" onclick="downloadTxt('${t.id}')">⬇ TXT</button>
+        <button class="btn-sm" onclick="downloadSrt('${t.id}')">⬇ SRT</button>
+        <button class="btn-sm danger" onclick="deleteTranscript('${t.id}')">Sil</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+function getById(id) {
+  return transcripts.find(t => t.id === id)
+}
+
+function formatDate(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+function pad(n, len = 2) { return String(n).padStart(len, '0') }
+function formatSRTTime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60), ms = Math.round((s % 1) * 1000)
+  return `${pad(h)}:${pad(m)}:${pad(sec)},${pad(ms, 3)}`
+}
+
+function download(content, filename, type) {
+  const blob = new Blob([content], { type })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+function downloadTxt(id) {
+  const t = getById(id)
+  if (t) download(t.text, t.filename.replace(/\.[^.]+$/, '') + '.txt', 'text/plain')
+}
+
+function downloadSrt(id) {
+  const t = getById(id)
+  if (!t || !t.segments) return
+  const srt = t.segments.map((seg, i) =>
+    `${i + 1}\n${formatSRTTime(seg.start)} --> ${formatSRTTime(seg.end)}\n${seg.text}\n`
+  ).join('\n')
+  download(srt, t.filename.replace(/\.[^.]+$/, '') + '.srt', 'text/plain')
+}
+
+async function deleteTranscript(id) {
+  if (!confirm('Bu transkripti silmek istediğinizden emin misiniz?')) return
+  await fetch(`/transcripts/${id}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+  })
+  transcripts = transcripts.filter(t => t.id !== id)
+  render()
+}
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut()
+  window.location.href = '/login'
+})
+
+init()
+</script>
+</body>
+</html>
