@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profil — Transkript Aracı</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  .stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; margin-bottom:1.25rem; }
+  @media(max-width:500px) { .stats-grid { grid-template-columns:1fr; } }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:1.125rem 1.25rem; box-shadow:var(--shadow-s); }
+  .stat-label { font-size:.73rem; color:var(--text-3); font-weight:500; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.35rem; }
+  .stat-val   { font-size:1.55rem; font-weight:700; letter-spacing:-.02em; }
+  .stat-sub   { font-size:.73rem; color:var(--text-3); margin-top:.15rem; }
+
+  .section { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:1.375rem 1.5rem; margin-bottom:.875rem; box-shadow:var(--shadow-s); }
+  .sec-title { font-size:.875rem; font-weight:600; margin-bottom:1rem; }
+
+  .avatar-row { display:flex; align-items:center; gap:1.25rem; margin-bottom:1.25rem; }
+  .avatar-wrap { position:relative; width:68px; height:68px; flex-shrink:0; cursor:pointer; }
+  .avatar-img  { width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid var(--border); background:var(--elevated); display:block; }
+  .avatar-ov   { position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,.52); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; font-size:.68rem; color:#fff; font-weight:600; }
+  .avatar-wrap:hover .avatar-ov { opacity:1; }
+  .av-info h3 { font-size:.9rem; font-weight:600; }
+  .av-info p  { font-size:.78rem; color:var(--text-3); margin-top:.2rem; }
+
+  .save-row { display:flex; align-items:center; gap:.75rem; margin-top:.875rem; }
+  .save-ok  { font-size:.8rem; color:var(--ok); display:none; }
+
+  .danger-sec { background:var(--surface); border:1px solid rgba(196,88,88,.28); border-radius:var(--r); padding:1.375rem 1.5rem; box-shadow:var(--shadow-s); }
+  .danger-title { font-size:.875rem; font-weight:600; color:var(--err); margin-bottom:.45rem; }
+  .danger-desc  { font-size:.82rem; color:var(--text-3); margin-bottom:1rem; line-height:1.55; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">Transkript Aracı</a>
+    <div class="nav-sep"></div>
+    <span class="nav-email" id="nav-email"></span>
+    <a href="/" class="nav-link">Ana Sayfa</a>
+    <a href="/archive" class="nav-link">Arşiv</a>
+    <button class="nav-btn" id="logout-btn">Çıkış</button>
+    <button class="theme-btn" id="theme-btn" title="Gece/gündüz modu">
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="page" style="max-width:640px;">
+  <div style="margin-bottom:1.75rem;">
+    <h1 style="font-size:1.3rem;font-weight:700;">Profil</h1>
+    <p style="font-size:.85rem;color:var(--text-3);margin-top:.2rem;">Hesap ayarları ve istatistikler</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Transkript</div>
+      <div class="stat-val" id="s-total">—</div>
+      <div class="stat-sub">toplam</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Süre</div>
+      <div class="stat-val" id="s-min">—</div>
+      <div class="stat-sub">dakika</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Dil</div>
+      <div class="stat-val" id="s-lang" style="font-size:1.1rem;line-height:1.4;">—</div>
+      <div class="stat-sub">en çok kullanılan</div>
+    </div>
+  </div>
+
+  <!-- Profile info -->
+  <div class="section">
+    <p class="sec-title">Profil Bilgileri</p>
+
+    <div class="avatar-row">
+      <div class="avatar-wrap" id="avatar-wrap">
+        <img class="avatar-img" id="avatar-img" src="" alt="Avatar">
+        <div class="avatar-ov">Değiştir</div>
+      </div>
+      <input type="file" id="avatar-input" accept="image/*" style="display:none">
+      <div class="av-info">
+        <h3 id="av-username">—</h3>
+        <p>Profil fotoğrafını değiştirmek için tıkla</p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="uname-inp">Kullanıcı adı</label>
+      <input class="inp" type="text" id="uname-inp" placeholder="kullaniciadi">
+    </div>
+
+    <div class="field">
+      <label class="field-label">E-posta</label>
+      <input class="inp" type="email" id="email-inp" disabled>
+    </div>
+
+    <div class="save-row">
+      <button class="btn btn-primary" id="save-btn">Kaydet</button>
+      <span class="save-ok" id="save-ok">✓ Kaydedildi</span>
+    </div>
+    <div id="profile-msg" style="display:none;margin-top:.75rem;"></div>
+  </div>
+
+  <!-- Session -->
+  <div class="section">
+    <p class="sec-title">Oturum Yönetimi</p>
+    <p style="font-size:.83rem;color:var(--text-3);margin-bottom:.875rem;line-height:1.55;">Tüm cihazlardaki oturumunuzu kapatır. Tekrar giriş yapmanız gerekir.</p>
+    <button class="btn btn-ghost" id="signout-all-btn">Tüm cihazlarda çıkış yap</button>
+  </div>
+
+  <!-- Danger -->
+  <div class="danger-sec">
+    <p class="danger-title">Tehlikeli Bölge</p>
+    <p class="danger-desc">Hesabınızı silerseniz tüm transkriptleriniz ve verileriniz kalıcı olarak silinir. Bu işlem geri alınamaz.</p>
+    <button class="btn btn-danger" id="del-btn">Hesabı Sil</button>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="modal-overlay" id="del-modal">
+  <div class="modal">
+    <p class="modal-title">Hesabı silmek istediğinizden emin misiniz?</p>
+    <p class="modal-desc">Tüm transkriptleriniz ve hesap verileriniz kalıcı olarak silinecek. Bu işlem <strong>geri alınamaz</strong>.</p>
+    <div id="modal-msg" style="display:none;margin-bottom:.75rem;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-cancel">İptal</button>
+      <button class="btn btn-danger" id="modal-confirm">Evet, hesabı sil</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let sb = null, session = null
+
+async function init() {
+  const cfg = await fetch('/config').then(r => r.json())
+  const rem = localStorage.getItem('remember_me') !== 'false'
+  sb = supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+    auth: { storage: rem ? localStorage : sessionStorage, persistSession: true }
+  })
+  const { data: { session: s } } = await sb.auth.getSession()
+  if (!s) { window.location.href = '/login'; return }
+  session = s
+  initTheme()
+  populateUser()
+  loadStats()
+}
+
+function populateUser() {
+  const u = session.user
+  const username = u.user_metadata?.username || ''
+  document.getElementById('nav-email').textContent = username || u.email
+  document.getElementById('av-username').textContent = username || u.email
+  document.getElementById('uname-inp').value = username
+  document.getElementById('email-inp').value = u.email
+  const avatar = u.user_metadata?.avatar_url
+  document.getElementById('avatar-img').src = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username||u.email)}`
+}
+
+async function loadStats() {
+  const res = await fetch('/stats', { headers: { Authorization: `Bearer ${session.access_token}` } })
+  if (!res.ok) return
+  const d = await res.json()
+  document.getElementById('s-total').textContent = d.total_transcripts
+  document.getElementById('s-min').textContent = d.total_minutes
+  document.getElementById('s-lang').textContent = d.top_language ? d.top_language.toUpperCase() : '—'
+}
+
+// Avatar
+document.getElementById('avatar-wrap').addEventListener('click', () => document.getElementById('avatar-input').click())
+document.getElementById('avatar-input').addEventListener('change', async e => {
+  const file = e.target.files[0]
+  if (!file || !file.type.startsWith('image/')) return
+  const ext = file.name.split('.').pop()
+  const path = `${session.user.id}/avatar.${ext}`
+  const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true })
+  if (error) { showMsg('profile-msg', 'Avatar yüklenemedi: ' + error.message, 'err'); return }
+  const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(path)
+  await sb.auth.updateUser({ data: { avatar_url: publicUrl } })
+  document.getElementById('avatar-img').src = publicUrl + '?t=' + Date.now()
+})
+
+// Save profile
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const username = document.getElementById('uname-inp').value.trim()
+  if (!username) return
+  const btn = document.getElementById('save-btn')
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'
+  const { error } = await sb.auth.updateUser({ data: { username } })
+  if (error) {
+    showMsg('profile-msg', error.message, 'err')
+  } else {
+    document.getElementById('av-username').textContent = username
+    document.getElementById('nav-email').textContent = username
+    const ok = document.getElementById('save-ok')
+    ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none' }, 2500)
+  }
+  btn.disabled = false; btn.textContent = 'Kaydet'
+})
+
+// Sign out all
+document.getElementById('signout-all-btn').addEventListener('click', async () => {
+  await sb.auth.signOut({ scope: 'global' }); window.location.href = '/login'
+})
+
+// Delete modal
+document.getElementById('del-btn').addEventListener('click', () => document.getElementById('del-modal').classList.add('open'))
+document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('del-modal').classList.remove('open'))
+document.getElementById('modal-confirm').addEventListener('click', async () => {
+  const btn = document.getElementById('modal-confirm')
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Siliniyor...'
+  const res = await fetch('/account', { method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` } })
+  if (res.ok) {
+    await sb.auth.signOut(); window.location.href = '/login'
+  } else {
+    const data = await res.json()
+    showMsg('modal-msg', data.detail || 'Hesap silinemedi.', 'err')
+    btn.disabled = false; btn.textContent = 'Evet, hesabı sil'
+  }
+})
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut(); window.location.href = '/login'
+})
+
+function showMsg(id, text, type) {
+  const el = document.getElementById(id)
+  el.className = 'alert alert-' + type; el.textContent = text; el.style.display = 'block'
+}
+
+init()
+</script>
+</body>
+</html>

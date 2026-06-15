@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transkript — Transkript Aracı</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .share-header { padding:1.75rem 0 1.25rem; }
+  .share-title { font-size:1.35rem; font-weight:700; letter-spacing:-.02em; margin-bottom:.5rem; word-break:break-word; }
+  .meta-row { display:flex; gap:.45rem; align-items:center; flex-wrap:wrap; }
+  .c-date, .c-dur { font-size:.75rem; color:var(--text-3); }
+  .shared-badge { display:inline-flex; align-items:center; gap:.3rem; font-size:.68rem; padding:.18rem .5rem; border-radius:99px; background:var(--ok-d); border:1px solid rgba(74,158,112,.25); color:var(--ok); }
+
+  .actions-row { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.875rem; }
+
+  .ts-row { display:flex; align-items:center; gap:.5rem; margin-bottom:.75rem; font-size:.82rem; color:var(--text-3); }
+  .toggle { position:relative; display:inline-block; width:34px; height:19px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:20px; transition:.2s; }
+  .slider:before { content:""; position:absolute; width:13px; height:13px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+  input:checked + .slider { background:var(--accent); }
+  input:checked + .slider:before { transform:translateX(15px); }
+
+  .transcript-body {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    padding:1.375rem; font-size:.9rem; line-height:1.8; white-space:pre-wrap;
+    word-break:break-word; max-height:70vh; overflow-y:auto; box-shadow:var(--shadow-s);
+  }
+  .seg-ts { font-size:.72rem; color:var(--accent); font-family:monospace; font-weight:600; margin-right:.4rem; }
+
+  .not-found { text-align:center; padding:5rem 0; }
+  .not-found h2 { font-size:1.1rem; margin-bottom:.5rem; }
+  .not-found p  { color:var(--text-3); font-size:.875rem; margin-bottom:1rem; }
+  .not-found a  { color:var(--accent); text-decoration:none; font-size:.875rem; }
+
+  .copy-ok { font-size:.78rem; color:var(--ok); display:none; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">Transkript Aracı</a>
+    <div class="nav-sep"></div>
+    <a href="/" class="nav-link">Kendi transkriptini oluştur →</a>
+    <button class="theme-btn" id="theme-btn" title="Gece/gündüz modu">
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="page">
+  <div id="content" style="display:none">
+    <div class="share-header">
+      <div class="share-title" id="t-title"></div>
+      <div class="meta-row">
+        <span class="badge badge-accent" id="t-lang"></span>
+        <span class="c-date" id="t-date"></span>
+        <span class="c-dur" id="t-dur"></span>
+        <span class="shared-badge">🔗 Paylaşılan transkript</span>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn btn-ghost btn-sm" id="copy-btn">📋 Kopyala <span class="copy-ok" id="copy-ok">✓</span></button>
+      <button class="btn btn-ghost btn-sm" id="dl-txt-btn">↓ TXT</button>
+      <button class="btn btn-ghost btn-sm" id="dl-srt-btn">↓ SRT</button>
+    </div>
+
+    <div class="ts-row">
+      <label class="toggle"><input type="checkbox" id="ts-toggle" checked><span class="slider"></span></label>
+      Zaman damgaları
+    </div>
+
+    <div class="transcript-body" id="t-body"></div>
+  </div>
+
+  <div class="not-found" id="not-found" style="display:none">
+    <h2>Transkript bulunamadı</h2>
+    <p>Bu bağlantı geçersiz veya paylaşım kapatılmış olabilir.</p>
+    <a href="/">Ana sayfaya dön</a>
+  </div>
+</div>
+
+<script>
+let data = null
+const token = location.pathname.split('/share/')[1]
+
+async function load() {
+  initTheme()
+  try {
+    const res = await fetch(`/api/share/${token}`)
+    if (!res.ok) { showNotFound(); return }
+    data = await res.json()
+    document.title = data.filename + ' — Transkript Aracı'
+    document.getElementById('t-title').textContent = data.filename
+    document.getElementById('t-lang').textContent = (data.language || '').toUpperCase()
+    document.getElementById('t-date').textContent = new Date(data.created_at).toLocaleDateString('tr-TR', { day:'2-digit', month:'long', year:'numeric' })
+    if (data.duration_seconds) {
+      const m = Math.floor(data.duration_seconds / 60), s = Math.floor(data.duration_seconds % 60)
+      document.getElementById('t-dur').textContent = `· ${m > 0 ? m + 'd ' : ''}${s}s`
+    }
+    renderBody()
+    document.getElementById('content').style.display = 'block'
+  } catch { showNotFound() }
+}
+
+function showNotFound() { document.getElementById('not-found').style.display = 'block' }
+
+function renderBody() {
+  const el = document.getElementById('t-body')
+  const showTs = document.getElementById('ts-toggle').checked
+  if (showTs && data.segments?.length) {
+    el.innerHTML = data.segments.map(s =>
+      `<div><span class="seg-ts">[${fmt(s.start)}]</span>${esc(s.text)}</div>`
+    ).join('')
+  } else {
+    el.textContent = data.text
+  }
+}
+document.getElementById('ts-toggle').addEventListener('change', renderBody)
+
+document.getElementById('copy-btn').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(data?.text || '')
+  const ok = document.getElementById('copy-ok')
+  ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none' }, 2000)
+})
+document.getElementById('dl-txt-btn').addEventListener('click', () => {
+  if (data) dl(data.text, data.filename.replace(/\.[^.]+$/, '') + '.txt', 'text/plain')
+})
+document.getElementById('dl-srt-btn').addEventListener('click', () => {
+  if (!data?.segments) return
+  const srt = data.segments.map((s, i) => `${i+1}\n${srtT(s.start)} --> ${srtT(s.end)}\n${s.text}\n`).join('\n')
+  dl(srt, data.filename.replace(/\.[^.]+$/, '') + '.srt', 'text/plain')
+})
+
+function dl(content, name, type) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([content], { type }))
+  a.download = name; a.click(); URL.revokeObjectURL(a.href)
+}
+function pad(n, l=2) { return String(n).padStart(l,'0') }
+function fmt(s)  { return `${pad(Math.floor(s/60))}:${pad(Math.floor(s%60))}` }
+function srtT(s) { return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(Math.floor(s%60))},${pad(Math.round((s%1)*1000),3)}` }
+function esc(s)  { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+load()
+</script>
+</body>
+</html>

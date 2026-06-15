@@ -1,282 +1,630 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arşiv — Video Transkript Aracı</title>
+<title>Arşiv — Transkript Aracı</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
-  :root {
-    --bg: #0d0d0f;
-    --surface: #18181b;
-    --surface2: #27272a;
-    --border: #3f3f46;
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --primary-dim: #6366f120;
-    --danger: #ef4444;
-    --text: #f4f4f5;
-    --text-muted: #a1a1aa;
-    --radius: 12px;
-    --radius-sm: 8px;
+  /* ── Toolbar ───────────────────── */
+  .toolbar { display:flex; gap:.65rem; flex-wrap:wrap; margin-bottom:1rem; }
+  .search-wrap { position:relative; flex:1; min-width:180px; }
+  .search-wrap svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--text-3); pointer-events:none; }
+  .search-inp { padding-left:2.25rem !important; }
+  .filter-sel {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-s);
+    color:var(--text); padding:.62rem .875rem; font-size:.85rem; outline:none; cursor:pointer;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5d78' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right .6rem center; padding-right:1.8rem;
+    transition:border-color .15s;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: system-ui, -apple-system, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 1rem 4rem;
-  }
-  nav {
-    width: 100%;
-    max-width: 720px;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 2rem;
-  }
-  .nav-home {
-    font-weight: 700;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-decoration: none;
-    font-size: 0.95rem;
-  }
-  .nav-email {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-left: auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 200px;
-  }
-  .nav-btn {
-    padding: 0.35rem 0.75rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text);
-    white-space: nowrap;
-  }
-  .nav-btn:hover { background: var(--border); }
+  .filter-sel:focus { border-color:var(--focus); }
+  .results-count { font-size:.78rem; color:var(--text-3); margin-bottom:.75rem; }
 
-  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; align-self: flex-start; width: 100%; max-width: 720px; }
+  /* ── Bulk bar ──────────────────── */
+  .bulk-bar {
+    display:none; align-items:center; gap:.6rem;
+    background:var(--elevated); border:1px solid var(--border); border-radius:var(--r-s);
+    padding:.6rem 1rem; margin-bottom:.875rem; font-size:.82rem; flex-wrap:wrap;
+  }
+  .bulk-bar.on { display:flex; }
+  .bulk-count { flex:1; color:var(--text-2); min-width:80px; }
 
-  .empty {
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    margin-top: 3rem;
-    text-align: center;
+  /* ── Card ──────────────────────── */
+  .t-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    box-shadow:var(--shadow-s); padding:1.25rem 1.375rem; margin-bottom:.75rem;
+    transition:border-color .15s;
+  }
+  .t-card:hover { border-color:#2e3145; }
+
+  .card-top { display:flex; align-items:flex-start; gap:.75rem; margin-bottom:.75rem; }
+  .card-cb { margin-top:3px; width:16px; height:16px; flex-shrink:0; cursor:pointer; appearance:none; -webkit-appearance:none; border:1.5px solid var(--border); border-radius:4px; background:var(--elevated); transition:all .15s; }
+  .card-cb:checked { background:var(--accent); border-color:var(--accent); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:center; }
+  .card-meta { flex:1; min-width:0; }
+
+  .fn-wrap { display:flex; align-items:center; gap:.35rem; margin-bottom:.3rem; }
+  .fn-display { font-weight:600; font-size:.925rem; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color .15s; }
+  .fn-display:hover { color:var(--accent); }
+  .fn-input {
+    font-weight:600; font-size:.925rem; background:var(--elevated); border:1px solid var(--focus);
+    border-radius:5px; color:var(--text); padding:.1rem .4rem; outline:none; width:100%; display:none;
   }
 
-  .transcript-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    width: 100%;
-    max-width: 720px;
-    margin-bottom: 1rem;
-  }
-  .card-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-  .card-meta { flex: 1; min-width: 0; }
-  .card-filename {
-    font-weight: 600;
-    font-size: 0.95rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .card-info {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.3rem;
-    flex-wrap: wrap;
-  }
-  .badge {
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 99px;
-    background: var(--primary-dim);
-    color: #a5b4fc;
-    border: 1px solid #6366f140;
-  }
-  .date {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-  .card-preview {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin-bottom: 1rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-  .btn-sm {
-    padding: 0.35rem 0.75rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text);
-    transition: background 0.15s;
-  }
-  .btn-sm:hover { background: var(--border); }
-  .btn-sm.danger { border-color: #ef444440; color: #fca5a5; }
-  .btn-sm.danger:hover { background: #ef444420; }
+  .card-info { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
+  .c-date, .c-dur { font-size:.72rem; color:var(--text-3); }
 
-  .loading { color: var(--text-muted); margin-top: 3rem; font-size: 0.9rem; }
+  /* ── Tags ──────────────────────── */
+  .tags-row { display:flex; flex-wrap:wrap; gap:.3rem; margin:.65rem 0; align-items:center; }
+  .tag {
+    font-size:.7rem; padding:.18rem .5rem; border-radius:99px;
+    background:var(--elevated); border:1px solid var(--border); color:var(--text-2);
+    display:flex; align-items:center; gap:.3rem;
+  }
+  .tag-rm { cursor:pointer; color:var(--text-3); font-size:.85em; line-height:1; }
+  .tag-rm:hover { color:var(--err); }
+  .tag-add-btn {
+    font-size:.7rem; padding:.18rem .45rem; border-radius:99px;
+    background:none; border:1px dashed var(--border); color:var(--text-3); cursor:pointer; transition:all .15s;
+  }
+  .tag-add-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .tag-inp-wrap { display:none; }
+  .tag-inp {
+    font-size:.7rem; padding:.18rem .5rem; border-radius:99px;
+    background:var(--elevated); border:1px solid var(--focus); color:var(--text); outline:none; width:90px;
+  }
+
+  /* ── Preview / Edit ────────────── */
+  .c-preview {
+    font-size:.85rem; color:var(--text-2); line-height:1.65; margin:.6rem 0;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .c-preview.exp { display:block; }
+  .edit-area {
+    display:none; width:100%; background:var(--elevated); border:1px solid var(--border);
+    border-radius:var(--r-s); color:var(--text); padding:.75rem; font-size:.875rem;
+    line-height:1.65; resize:vertical; outline:none; min-height:110px; margin:.5rem 0; font-family:inherit;
+  }
+  .edit-area:focus { border-color:var(--focus); }
+
+  /* ── Card actions ──────────────── */
+  .card-actions { display:flex; gap:.35rem; flex-wrap:wrap; align-items:center; }
+  .edit-acts { display:none; gap:.35rem; }
+  .action-share-on { color:#8b80e0; border-color:rgba(91,106,209,.3); background:var(--accent-d); }
+
+  .empty   { text-align:center; color:var(--text-3); padding:4rem 0; font-size:.9rem; }
+  .loading { text-align:center; color:var(--text-3); padding:3rem 0; font-size:.875rem; }
+
+  /* ── Report modal ──────────────── */
+  .rep-loading { display:flex; flex-direction:column; align-items:center; gap:.75rem; padding:1.75rem 0; color:var(--text-3); font-size:.85rem; }
+  .rep-error   { color:var(--err); font-size:.875rem; padding:.75rem 0; }
+  .rep-content { display:none; }
+  .rep-meta    { font-size:.78rem; color:var(--text-3); margin-bottom:1rem; padding-bottom:.875rem; border-bottom:1px solid var(--border); }
+  .rep-sec-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); margin-bottom:.5rem; display:flex; align-items:center; gap:.5rem; }
+  .rep-sec-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .rep-summary { font-size:.875rem; line-height:1.75; color:var(--text-2); white-space:pre-line; margin-bottom:1.125rem; }
+  .rep-points  { list-style:none; margin-bottom:1.125rem; display:flex; flex-direction:column; gap:.35rem; }
+  .rep-points li { font-size:.85rem; color:var(--text-2); line-height:1.55; display:flex; gap:.55rem; align-items:flex-start; }
+  .rep-points li::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; margin-top:.5rem; }
+  .rep-kws  { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:1.25rem; }
+  .rep-kw   { font-size:.72rem; padding:.2rem .55rem; border-radius:99px; background:var(--accent-d); border:1px solid rgba(91,106,209,.22); color:#8b80e0; }
+  .rep-dl-row { display:flex; gap:.45rem; padding-top:.875rem; border-top:1px solid var(--border); }
+  .modal-close-btn { background:none; border:none; cursor:pointer; color:var(--text-3); font-size:1.4rem; line-height:1; padding:2px 5px; border-radius:4px; transition:color .15s; }
+  .modal-close-btn:hover { color:var(--text); }
+  .modal-scroll { max-height:62vh; overflow-y:auto; padding-right:2px; }
 </style>
 </head>
 <body>
 
-<nav>
-  <a href="/" class="nav-home">← Ana Sayfa</a>
-  <span class="nav-email" id="nav-email"></span>
-  <button class="nav-btn" id="logout-btn">Çıkış</button>
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">Transkript Aracı</a>
+    <div class="nav-sep"></div>
+    <span class="nav-email" id="nav-email"></span>
+    <a href="/profile" class="nav-link">Profil</a>
+    <button class="nav-btn" id="logout-btn">Çıkış</button>
+    <button class="theme-btn" id="theme-btn" title="Gece/gündüz modu">
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
 </nav>
 
-<h1>Transkript Arşivi</h1>
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+    <h1 style="font-size:1.3rem;font-weight:700;">Arşiv</h1>
+    <a href="/" class="btn btn-primary btn-sm">+ Yeni Transkript</a>
+  </div>
 
-<div class="loading" id="loading">Yükleniyor...</div>
-<div class="empty" id="empty" style="display:none;">Henüz transkript yok. Ana sayfadan bir dosya yükleyin.</div>
-<div id="list"></div>
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="inp search-inp" id="q" placeholder="Transkript veya dosya adı ara...">
+    </div>
+    <select class="filter-sel" id="lang-f">
+      <option value="">Tüm diller</option>
+    </select>
+    <select class="filter-sel" id="date-f">
+      <option value="">Tüm zamanlar</option>
+      <option value="week">Bu hafta</option>
+      <option value="month">Bu ay</option>
+    </select>
+    <select class="filter-sel" id="sort-f">
+      <option value="desc">Yeniden eskiye</option>
+      <option value="asc">Eskiden yeniye</option>
+    </select>
+  </div>
+
+  <div class="results-count" id="rcount"></div>
+
+  <!-- Bulk bar -->
+  <div class="bulk-bar" id="bulk-bar">
+    <span class="bulk-count" id="bulk-count">0 seçili</span>
+    <button class="btn btn-primary btn-sm" id="bulk-txt-btn">↓ TXT (ZIP)</button>
+    <button class="btn btn-primary btn-sm" id="bulk-srt-btn">↓ SRT (ZIP)</button>
+    <button class="btn btn-danger btn-sm" id="bulk-del-btn">Sil</button>
+    <button class="btn btn-ghost btn-sm" id="bulk-clr-btn">İptal</button>
+  </div>
+
+  <div class="loading" id="loading">Yükleniyor...</div>
+  <div id="list"></div>
+  <div class="empty" id="empty" style="display:none">Transkript bulunamadı.</div>
+</div>
+
+<!-- Report modal -->
+<div class="modal-overlay" id="rep-modal">
+  <div class="modal" style="max-width:560px;width:100%;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;">
+      <div>
+        <p class="modal-title" id="rep-title" style="margin-bottom:.15rem;">Transkript Raporu</p>
+        <p style="font-size:.78rem;color:var(--text-3);" id="rep-sub"></p>
+      </div>
+      <button class="modal-close-btn" id="rep-close">×</button>
+    </div>
+    <div class="modal-scroll">
+      <div class="rep-loading" id="rep-loading">
+        <span class="spinner" style="color:var(--accent);"></span>
+        <span>Rapor hazırlanıyor...</span>
+      </div>
+      <div class="rep-error" id="rep-error" style="display:none;"></div>
+      <div class="rep-content" id="rep-content">
+        <div class="rep-meta" id="rep-meta"></div>
+        <div class="rep-sec-title">Özet</div>
+        <div class="rep-summary" id="rep-summary"></div>
+        <div class="rep-sec-title">Temel Noktalar</div>
+        <ul class="rep-points" id="rep-points"></ul>
+        <div class="rep-sec-title">Anahtar Kelimeler</div>
+        <div class="rep-kws" id="rep-kws"></div>
+        <div class="rep-dl-row">
+          <button class="btn btn-ghost btn-sm" id="rep-txt">↓ TXT olarak indir</button>
+          <button class="btn btn-primary btn-sm" id="rep-pdf">↓ PDF olarak indir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
-let supabaseClient = null
-let currentSession = null
-let transcripts = []
+let sb = null, session = null, all = []
 
 async function init() {
-  const config = await fetch('/config').then(r => r.json())
-  const { createClient } = supabase
-  const rememberMe = localStorage.getItem('remember_me') !== 'false'
-  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key, {
-    auth: { storage: rememberMe ? localStorage : sessionStorage, persistSession: true }
+  const cfg = await fetch('/config').then(r => r.json())
+  const rem = localStorage.getItem('remember_me') !== 'false'
+  sb = supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+    auth: { storage: rem ? localStorage : sessionStorage, persistSession: true }
   })
-
-  const { data: { session } } = await supabaseClient.auth.getSession()
-  if (!session) { window.location.href = '/login'; return }
-  currentSession = session
-  document.getElementById('nav-email').textContent = session.user.email
-
-  await loadTranscripts()
+  const { data: { session: s } } = await sb.auth.getSession()
+  if (!s) { window.location.href = '/login'; return }
+  session = s
+  document.getElementById('nav-email').textContent = s.user.user_metadata?.username || s.user.email
+  initTheme()
+  await load()
 }
 
-async function loadTranscripts() {
-  const res = await fetch('/transcripts', {
-    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
-  })
-  transcripts = await res.json()
-  render()
+async function load() {
+  const res = await fetch('/transcripts', { headers: { Authorization: `Bearer ${session.access_token}` } })
+  all = await res.json()
+  buildLangFilter()
+  filter()
 }
 
-function render() {
+function buildLangFilter() {
+  const langs = [...new Set(all.map(t => t.language).filter(Boolean))]
+  const sel = document.getElementById('lang-f')
+  langs.forEach(l => { const o = document.createElement('option'); o.value = l; o.textContent = l.toUpperCase(); sel.appendChild(o) })
+}
+
+function filter() {
   document.getElementById('loading').style.display = 'none'
-  if (!transcripts.length) {
-    document.getElementById('empty').style.display = 'block'
-    return
-  }
-  const list = document.getElementById('list')
-  list.innerHTML = transcripts.map(t => `
-    <div class="transcript-card" data-id="${t.id}">
-      <div class="card-header">
+  const q = document.getElementById('q').value.toLowerCase()
+  const lang = document.getElementById('lang-f').value
+  const date = document.getElementById('date-f').value
+  const sort = document.getElementById('sort-f').value
+  const now = Date.now()
+
+  let res = all.filter(t => {
+    if (lang && t.language !== lang) return false
+    if (date === 'week'  && now - new Date(t.created_at) > 7  * 86400000) return false
+    if (date === 'month' && now - new Date(t.created_at) > 30 * 86400000) return false
+    if (q && !t.filename?.toLowerCase().includes(q) && !t.text?.toLowerCase().includes(q)) return false
+    return true
+  })
+  if (sort === 'asc') res = res.slice().reverse()
+
+  document.getElementById('rcount').textContent =
+    res.length === all.length ? `${res.length} transkript` : `${res.length} / ${all.length} transkript`
+  render(res)
+}
+['q','lang-f','date-f','sort-f'].forEach(id => document.getElementById(id).addEventListener('input', filter))
+
+function render(list) {
+  const container = document.getElementById('list')
+  const empty = document.getElementById('empty')
+  if (!list.length) { container.innerHTML = ''; empty.style.display = 'block'; return }
+  empty.style.display = 'none'
+
+  container.innerHTML = list.map(t => {
+    const tags = (t.tags || []).map(g =>
+      `<span class="tag">${esc(g)}<span class="tag-rm" data-id="${t.id}" data-tag="${esc(g)}">×</span></span>`
+    ).join('')
+    const dur = t.duration_seconds ? fmtDur(t.duration_seconds) : ''
+    const shareBtn = t.is_public
+      ? `<button class="btn btn-ghost btn-sm action-share-on" id="sb-${t.id}" onclick="toggleShare('${t.id}')">🔒 Paylaşımı Kapat</button>`
+      : `<button class="btn btn-ghost btn-sm" id="sb-${t.id}" onclick="toggleShare('${t.id}')">🔗 Paylaş</button>`
+    return `
+    <div class="t-card" data-id="${t.id}">
+      <div class="card-top">
+        <input type="checkbox" class="card-cb" data-id="${t.id}">
         <div class="card-meta">
-          <div class="card-filename">${escapeHtml(t.filename)}</div>
+          <div class="fn-wrap">
+            <span class="fn-display" data-id="${t.id}">${esc(t.filename)}</span>
+            <input class="fn-input" data-id="${t.id}" value="${esc(t.filename)}">
+          </div>
           <div class="card-info">
-            <span class="badge">${t.language.toUpperCase()}</span>
-            <span class="date">${formatDate(t.created_at)}</span>
+            <span class="badge badge-accent">${(t.language||'').toUpperCase()}</span>
+            <span class="c-date">${fmtDate(t.created_at)}</span>
+            ${dur ? `<span class="c-dur">· ${dur}</span>` : ''}
           </div>
         </div>
       </div>
-      <div class="card-preview">${escapeHtml(t.text)}</div>
-      <div class="card-actions">
-        <button class="btn-sm" onclick="downloadTxt('${t.id}')">⬇ TXT</button>
-        <button class="btn-sm" onclick="downloadSrt('${t.id}')">⬇ SRT</button>
-        <button class="btn-sm danger" onclick="deleteTranscript('${t.id}')">Sil</button>
+      <div class="tags-row">
+        ${tags}
+        <button class="tag-add-btn" data-id="${t.id}">+ Etiket</button>
+        <span class="tag-inp-wrap" data-id="${t.id}">
+          <input class="tag-inp" data-id="${t.id}" placeholder="etiket..." maxlength="20">
+        </span>
       </div>
-    </div>
-  `).join('')
+      <div class="c-preview" id="prev-${t.id}">${esc(t.text)}</div>
+      <textarea class="edit-area" id="edit-${t.id}">${esc(t.text)}</textarea>
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="togglePreview('${t.id}')">Genişlet</button>
+        <button class="btn btn-ghost btn-sm" onclick="startEdit('${t.id}')">Düzenle</button>
+        <button class="btn btn-ghost btn-sm" onclick="dlTxt('${t.id}')">↓ TXT</button>
+        <button class="btn btn-ghost btn-sm" onclick="dlSrt('${t.id}')">↓ SRT</button>
+        <span class="edit-acts" id="ea-${t.id}">
+          <button class="btn btn-primary btn-sm" onclick="saveEdit('${t.id}')">Kaydet</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelEdit('${t.id}')">İptal</button>
+        </span>
+        <button class="btn btn-ghost btn-sm" onclick="openReport('${t.id}')">📊 Rapor</button>
+        ${shareBtn}
+        <button class="btn btn-danger btn-sm" onclick="delT('${t.id}')">Sil</button>
+      </div>
+    </div>`
+  }).join('')
+  bindEvents()
+  bindCbs()
 }
 
-function getById(id) {
-  return transcripts.find(t => t.id === id)
-}
-
-function formatDate(iso) {
-  const d = new Date(iso)
-  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function escapeHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-}
-
-function pad(n, len = 2) { return String(n).padStart(len, '0') }
-function formatSRTTime(s) {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60), ms = Math.round((s % 1) * 1000)
-  return `${pad(h)}:${pad(m)}:${pad(sec)},${pad(ms, 3)}`
-}
-
-function download(content, filename, type) {
-  const blob = new Blob([content], { type })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(a.href)
-}
-
-function downloadTxt(id) {
-  const t = getById(id)
-  if (t) download(t.text, t.filename.replace(/\.[^.]+$/, '') + '.txt', 'text/plain')
-}
-
-function downloadSrt(id) {
-  const t = getById(id)
-  if (!t || !t.segments) return
-  const srt = t.segments.map((seg, i) =>
-    `${i + 1}\n${formatSRTTime(seg.start)} --> ${formatSRTTime(seg.end)}\n${seg.text}\n`
-  ).join('\n')
-  download(srt, t.filename.replace(/\.[^.]+$/, '') + '.srt', 'text/plain')
-}
-
-async function deleteTranscript(id) {
-  if (!confirm('Bu transkripti silmek istediğinizden emin misiniz?')) return
-  await fetch(`/transcripts/${id}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+function bindEvents() {
+  // Filename inline edit
+  document.querySelectorAll('.fn-display').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id
+      const inp = document.querySelector(`.fn-input[data-id="${id}"]`)
+      el.style.display = 'none'; inp.style.display = 'block'; inp.focus(); inp.select()
+    })
   })
-  transcripts = transcripts.filter(t => t.id !== id)
-  render()
+  document.querySelectorAll('.fn-input').forEach(inp => {
+    const save = async () => {
+      const id = inp.dataset.id
+      const disp = document.querySelector(`.fn-display[data-id="${id}"]`)
+      const name = inp.value.trim() || disp.textContent
+      inp.style.display = 'none'; disp.style.display = ''
+      if (name !== disp.textContent) {
+        disp.textContent = name
+        const t = byId(id); if (t) t.filename = name
+        await put(id, { filename: name })
+      }
+    }
+    inp.addEventListener('blur', save)
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur() })
+  })
+
+  // Tag add
+  document.querySelectorAll('.tag-add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.style.display = 'none'
+      const wrap = document.querySelector(`.tag-inp-wrap[data-id="${btn.dataset.id}"]`)
+      wrap.style.display = 'inline'
+      const inp = wrap.querySelector('.tag-inp')
+      inp.value = ''; inp.focus()
+    })
+  })
+  document.querySelectorAll('.tag-inp').forEach(inp => {
+    const commit = async () => {
+      const id = inp.dataset.id
+      const tag = inp.value.trim().toLowerCase()
+      const wrap = inp.closest('.tag-inp-wrap')
+      const btn = document.querySelector(`.tag-add-btn[data-id="${id}"]`)
+      wrap.style.display = 'none'; btn.style.display = ''
+      if (tag) {
+        const t = byId(id)
+        if (t && !t.tags.includes(tag)) {
+          t.tags = [...t.tags, tag]
+          await put(id, { tags: t.tags })
+          filter()
+        }
+      }
+    }
+    inp.addEventListener('blur', commit)
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') inp.blur()
+      if (e.key === 'Escape') { inp.value = ''; inp.blur() }
+    })
+  })
+
+  // Tag remove
+  document.querySelectorAll('.tag-rm').forEach(el => {
+    el.addEventListener('click', async () => {
+      const t = byId(el.dataset.id)
+      if (t) {
+        t.tags = t.tags.filter(x => x !== el.dataset.tag)
+        await put(el.dataset.id, { tags: t.tags })
+        filter()
+      }
+    })
+  })
 }
+
+function bindCbs() {
+  document.querySelectorAll('.card-cb').forEach(cb => cb.addEventListener('change', updateBulk))
+}
+
+function getSelected() { return [...document.querySelectorAll('.card-cb:checked')].map(c => c.dataset.id) }
+
+function updateBulk() {
+  const ids = getSelected()
+  document.getElementById('bulk-count').textContent = `${ids.length} seçili`
+  document.getElementById('bulk-bar').classList.toggle('on', ids.length > 0)
+}
+
+document.getElementById('bulk-clr-btn').addEventListener('click', () => {
+  document.querySelectorAll('.card-cb').forEach(c => c.checked = false); updateBulk()
+})
+document.getElementById('bulk-del-btn').addEventListener('click', async () => {
+  const ids = getSelected()
+  if (!ids.length || !confirm(`${ids.length} transkripti silmek istediğinizden emin misiniz?`)) return
+  await Promise.all(ids.map(id => fetch(`/transcripts/${id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${session.access_token}` } })))
+  all = all.filter(t => !ids.includes(t.id)); filter()
+})
+document.getElementById('bulk-txt-btn').addEventListener('click', async () => {
+  const ids = getSelected(); if (!ids.length) return
+  const zip = new JSZip()
+  all.filter(t => ids.includes(t.id)).forEach(t => zip.file(t.filename.replace(/\.[^.]+$/,'')+'.txt', t.text))
+  dl(await zip.generateAsync({ type:'blob' }), 'transkriptler.zip', 'application/zip')
+})
+document.getElementById('bulk-srt-btn').addEventListener('click', async () => {
+  const ids = getSelected(); if (!ids.length) return
+  const zip = new JSZip()
+  all.filter(t => ids.includes(t.id) && t.segments).forEach(t => {
+    const srt = t.segments.map((s,i) => `${i+1}\n${srtT(s.start)} --> ${srtT(s.end)}\n${s.text}\n`).join('\n')
+    zip.file(t.filename.replace(/\.[^.]+$/,'')+'.srt', srt)
+  })
+  dl(await zip.generateAsync({ type:'blob' }), 'transkriptler.zip', 'application/zip')
+})
+
+function togglePreview(id) { document.getElementById(`prev-${id}`).classList.toggle('exp') }
+
+function startEdit(id) {
+  const t = byId(id)
+  const area = document.getElementById(`edit-${id}`)
+  area.value = t?.text || ''
+  document.getElementById(`prev-${id}`).style.display = 'none'
+  area.style.display = 'block'
+  document.getElementById(`ea-${id}`).style.display = 'flex'
+}
+async function saveEdit(id) {
+  const text = document.getElementById(`edit-${id}`).value
+  const t = byId(id); if (t) t.text = text
+  await put(id, { text }); cancelEdit(id); filter()
+}
+function cancelEdit(id) {
+  document.getElementById(`prev-${id}`).style.display = ''
+  document.getElementById(`edit-${id}`).style.display = 'none'
+  document.getElementById(`ea-${id}`).style.display = 'none'
+}
+
+async function toggleShare(id) {
+  const res = await fetch(`/transcripts/${id}/share`, { method:'POST', headers:{ Authorization:`Bearer ${session.access_token}` } })
+  const data = await res.json()
+  const t = byId(id); if (t) t.is_public = data.is_public
+  const btn = document.getElementById(`sb-${id}`)
+  if (data.is_public) {
+    const link = `${location.origin}/share/${data.share_token}`
+    await navigator.clipboard.writeText(link).catch(() => {})
+    btn.textContent = '✓ Link kopyalandı'
+    btn.classList.add('action-share-on')
+    setTimeout(() => { btn.textContent = '🔒 Paylaşımı Kapat' }, 2000)
+  } else {
+    btn.textContent = '🔗 Paylaş'
+    btn.classList.remove('action-share-on')
+  }
+}
+
+async function delT(id) {
+  if (!confirm('Bu transkripti silmek istediğinizden emin misiniz?')) return
+  await fetch(`/transcripts/${id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${session.access_token}` } })
+  all = all.filter(t => t.id !== id); filter()
+}
+
+function dlTxt(id) { const t=byId(id); if(t) dl(t.text, t.filename.replace(/\.[^.]+$/,'')+'.txt','text/plain') }
+function dlSrt(id) {
+  const t=byId(id); if(!t||!t.segments) return
+  const srt = t.segments.map((s,i)=>`${i+1}\n${srtT(s.start)} --> ${srtT(s.end)}\n${s.text}\n`).join('\n')
+  dl(srt, t.filename.replace(/\.[^.]+$/,'')+'.srt','text/plain')
+}
+
+async function put(id, data) {
+  await fetch(`/transcripts/${id}`, {
+    method:'PUT', headers:{ Authorization:`Bearer ${session.access_token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify(data)
+  })
+}
+
+function dl(content, name, type) {
+  const blob = content instanceof Blob ? content : new Blob([content],{type})
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+  a.download = name; a.click(); URL.revokeObjectURL(a.href)
+}
+
+function byId(id)    { return all.find(t => t.id === id) }
+function fmtDate(s)  { return new Date(s).toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}) }
+function fmtDur(s)   { const m=Math.floor(s/60),sec=Math.floor(s%60); return m>0?`${m}d ${sec}s`:`${sec}s` }
+function pad(n,l=2)  { return String(n).padStart(l,'0') }
+function srtT(s)     { return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(Math.floor(s%60))},${pad(Math.round((s%1)*1000),3)}` }
+function esc(s)      { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await supabaseClient.auth.signOut()
-  window.location.href = '/login'
+  await sb.auth.signOut(); window.location.href = '/login'
+})
+
+// ── Report ────────────────────────────────────────────────
+let currentReport = null
+
+function openReport(id) {
+  const t = byId(id)
+  currentReport = { id, filename: t?.filename, language: t?.language }
+  document.getElementById('rep-title').textContent = t?.filename || 'Transkript Raporu'
+  document.getElementById('rep-sub').textContent = ''
+  document.getElementById('rep-loading').style.display = 'flex'
+  document.getElementById('rep-error').style.display = 'none'
+  document.getElementById('rep-content').style.display = 'none'
+  document.getElementById('rep-modal').classList.add('open')
+  loadReport(id)
+}
+
+async function loadReport(id) {
+  try {
+    const headers = { 'Content-Type': 'application/json' }
+    if (session) headers['Authorization'] = `Bearer ${session.access_token}`
+    const res = await fetch('/summarize', {
+      method: 'POST', headers,
+      body: JSON.stringify({ transcript_id: id })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail || 'Özetleme başarısız')
+    currentReport = { ...currentReport, ...data }
+    renderReport(data)
+  } catch (err) {
+    document.getElementById('rep-loading').style.display = 'none'
+    document.getElementById('rep-error').style.display = 'block'
+    document.getElementById('rep-error').textContent = '❌ ' + err.message
+  }
+}
+
+function renderReport(data) {
+  document.getElementById('rep-loading').style.display = 'none'
+  document.getElementById('rep-content').style.display = 'block'
+  document.getElementById('rep-sub').textContent = [
+    (data.language || '').toUpperCase(),
+    data.word_count ? data.word_count.toLocaleString('tr-TR') + ' kelime' : ''
+  ].filter(Boolean).join(' · ')
+  document.getElementById('rep-meta').textContent = [
+    data.filename ? '📄 ' + data.filename : '',
+    data.language ? '🌐 ' + data.language.toUpperCase() : '',
+    data.word_count ? '📝 ' + data.word_count.toLocaleString('tr-TR') + ' kelime' : '',
+  ].filter(Boolean).join('   ·   ')
+  document.getElementById('rep-summary').textContent = data.summary || ''
+  document.getElementById('rep-points').innerHTML = (data.key_points || []).map(p => `<li>${esc(p)}</li>`).join('')
+  document.getElementById('rep-kws').innerHTML = (data.keywords || []).map(k => `<span class="rep-kw">${esc(k)}</span>`).join('')
+}
+
+document.getElementById('rep-close').addEventListener('click', () => document.getElementById('rep-modal').classList.remove('open'))
+document.getElementById('rep-modal').addEventListener('click', e => { if (e.target.id === 'rep-modal') document.getElementById('rep-modal').classList.remove('open') })
+
+document.getElementById('rep-txt').addEventListener('click', () => {
+  const r = currentReport; if (!r?.summary) return
+  const txt = [
+    '══════════════════════════════════════════════',
+    '   TRANSKRİPT ANALİZ RAPORU',
+    '══════════════════════════════════════════════',
+    '',
+    `Dosya        : ${r.filename || '—'}`,
+    `Dil          : ${(r.language || '').toUpperCase() || '—'}`,
+    `Kelime sayısı: ${r.word_count?.toLocaleString('tr-TR') || '—'}`,
+    `Tarih        : ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+    '',
+    '──────────────────────────────────────────────',
+    'ÖZET',
+    '──────────────────────────────────────────────',
+    '',
+    r.summary || '',
+    '',
+    '──────────────────────────────────────────────',
+    'TEMEL NOKTALAR',
+    '──────────────────────────────────────────────',
+    '',
+    ...(r.key_points || []).map((p, i) => `  ${i + 1}. ${p}`),
+    '',
+    '──────────────────────────────────────────────',
+    'ANAHTAR KELİMELER',
+    '──────────────────────────────────────────────',
+    '',
+    '  ' + (r.keywords || []).join('  ·  '),
+    '',
+    '══════════════════════════════════════════════',
+    '   Transkript Aracı',
+    '══════════════════════════════════════════════',
+  ].join('\n')
+  dl(txt, (r.filename?.replace(/\.[^.]+$/, '') || 'rapor') + '_rapor.txt', 'text/plain')
+})
+
+document.getElementById('rep-pdf').addEventListener('click', () => {
+  const r = currentReport; if (!r?.summary) return
+  const pts = (r.key_points || []).map(p => `<li>${esc(p)}</li>`).join('')
+  const kws = (r.keywords || []).map(k => `<span class="kw">${esc(k)}</span>`).join('')
+  const dateStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+  const win = window.open('', '_blank')
+  win.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Rapor — ${esc(r.filename || '')}</title><style>
+body{font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:40px auto;padding:0 24px;color:#1a1a1e;line-height:1.6;}
+h1{font-size:1.15rem;font-weight:700;margin-bottom:.2rem;}
+.sub{font-size:.75rem;color:#888;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:2px solid #5b6ad1;}
+h2{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5b6ad1;margin:1.25rem 0 .5rem;display:flex;align-items:center;gap:.5rem;}
+h2::after{content:'';flex:1;height:1px;background:#e0e3f0;}
+.sum{font-size:.875rem;line-height:1.75;color:#333;white-space:pre-line;}
+ul{list-style:none;padding:0;}
+li{font-size:.875rem;line-height:1.6;color:#333;padding-left:1.1rem;position:relative;margin-bottom:.3rem;}
+li::before{content:"\\2022";color:#5b6ad1;position:absolute;left:0;}
+.kws{display:flex;flex-wrap:wrap;gap:.35rem;}
+.kw{font-size:.75rem;padding:.2rem .55rem;border-radius:99px;background:#f0f2fb;border:1px solid #d0d5f0;color:#5b6ad1;}
+.footer{margin-top:2rem;padding-top:.75rem;border-top:1px solid #eee;font-size:.7rem;color:#bbb;text-align:center;}
+@media print{body{margin:0;}}
+</style></head><body>
+<h1>${esc(r.filename || 'Transkript')}</h1>
+<div class="sub">🌐 ${(r.language || '').toUpperCase()} &nbsp;·&nbsp; 📝 ${(r.word_count || 0).toLocaleString('tr-TR')} kelime &nbsp;·&nbsp; 📅 ${dateStr}</div>
+<h2>Özet</h2><div class="sum">${esc(r.summary || '')}</div>
+<h2>Temel Noktalar</h2><ul>${pts}</ul>
+<h2>Anahtar Kelimeler</h2><div class="kws">${kws}</div>
+<div class="footer">Transkript Aracı — ${dateStr}</div>
+</body></html>`)
+  win.document.close()
+  setTimeout(() => { win.focus(); win.print() }, 600)
 })
 
 init()

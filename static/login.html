@@ -1,295 +1,107 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Giriş — Transkript Aracı</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #09090b;
-    --card: #111113;
-    --surface: #1c1c1f;
-    --border: #2e2e33;
-    --border-focus: #6366f1;
-    --primary: #6366f1;
-    --primary-hover: #5254cc;
-    --text: #fafafa;
-    --text-sub: #a1a1aa;
-    --text-muted: #71717a;
-    --danger: #f87171;
-    --radius: 14px;
-    --radius-sm: 9px;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    padding: 1.5rem;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, #6366f115, transparent);
-  }
-
-  .wrapper {
-    width: 100%;
-    max-width: 400px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.75rem;
-  }
-
-  /* Logo */
-  .brand { text-align: center; }
-  .brand-icon {
-    width: 44px; height: 44px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    border-radius: 12px;
-    display: grid; place-items: center;
-    margin: 0 auto 0.75rem;
-    font-size: 1.3rem;
-  }
-  .brand h1 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--text);
-  }
-  .brand p { font-size: 0.85rem; color: var(--text-sub); margin-top: 0.25rem; }
-
-  /* Kart */
-  .card {
-    width: 100%;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.75rem;
-    box-shadow: 0 0 0 1px #ffffff04, 0 8px 40px #00000060;
-  }
-
-  .card-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--text);
-  }
-
-  /* Form */
-  .field { margin-bottom: 1rem; }
-  .field-label {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-sub);
-    margin-bottom: 0.4rem;
-  }
-  .input-wrap { position: relative; }
-  .input-wrap input {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    padding: 0.65rem 0.875rem;
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    -webkit-appearance: none;
-  }
-  .input-wrap input:focus {
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px #6366f118;
-  }
-  .input-wrap input::placeholder { color: var(--text-muted); }
-  .eye-btn {
-    position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer;
-    color: var(--text-muted); display: flex; align-items: center;
-    padding: 0; transition: color 0.15s;
-  }
-  .eye-btn:hover { color: var(--text-sub); }
-  .input-wrap input[type="password"] { padding-right: 2.5rem; }
-  .input-wrap input[type="text"].has-eye { padding-right: 2.5rem; }
-
-  /* Beni hatırla */
-  .remember-row {
-    display: flex; align-items: center; gap: 0.6rem;
-    margin-bottom: 1.25rem; cursor: pointer; user-select: none;
-  }
-  .remember-row input[type="checkbox"] { display: none; }
-  .check-box {
-    width: 17px; height: 17px; flex-shrink: 0;
-    border: 1.5px solid var(--border);
-    border-radius: 5px;
-    background: var(--surface);
-    display: grid; place-items: center;
-    transition: all 0.15s;
-  }
-  .remember-row input:checked + .check-box {
-    background: var(--primary); border-color: var(--primary);
-  }
-  .check-icon { display: none; }
-  .remember-row input:checked + .check-box .check-icon { display: block; }
-  .check-label { font-size: 0.85rem; color: var(--text-sub); }
-
-  /* Buton */
-  .btn-primary {
-    width: 100%; padding: 0.72rem;
-    background: var(--primary); color: #fff;
-    border: none; border-radius: var(--radius-sm);
-    font-size: 0.9rem; font-weight: 600;
-    cursor: pointer; transition: background 0.15s, transform 0.1s;
-    letter-spacing: 0.01em;
-  }
-  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-  .btn-primary:active:not(:disabled) { transform: scale(0.99); }
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Hata */
-  .error-msg {
-    display: none; margin-top: 0.875rem;
-    padding: 0.65rem 0.875rem;
-    background: #f8717112; border: 1px solid #f8717130;
-    border-radius: var(--radius-sm);
-    font-size: 0.825rem; color: var(--danger);
-  }
-
-  /* Divider */
-  .divider {
-    display: flex; align-items: center; gap: 0.75rem;
-    margin: 1.25rem 0; color: var(--text-muted); font-size: 0.8rem;
-  }
-  .divider::before, .divider::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
-  }
-
-  /* Footer linkler */
-  .footer-links { text-align: center; }
-  .footer-links a {
-    font-size: 0.85rem; color: var(--text-sub);
-    text-decoration: none; transition: color 0.15s;
-  }
-  .footer-links a:hover { color: var(--text); }
-  .footer-links a.primary-link { color: var(--primary); }
-  .footer-links a.primary-link:hover { color: #818cf8; }
-
-  .guest-row {
-    text-align: center;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-  }
-  .guest-row a {
-    color: var(--text-muted); text-decoration: none;
-    border-bottom: 1px dashed var(--border); transition: color 0.15s;
-  }
-  .guest-row a:hover { color: var(--text-sub); }
+  .card { padding: 1.875rem; }
+  .card .inp { padding-right: 2.6rem; }
 </style>
 </head>
-<body>
-<div class="wrapper">
+<body class="auth-body">
 
-  <div class="brand">
-    <div class="brand-icon">🎙️</div>
+<button class="theme-btn theme-fixed" id="theme-btn" title="Gece/gündüz modu">
+  <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
+
+<div class="auth-wrap">
+  <div class="auth-brand">
+    <div class="auth-icon">🎙️</div>
     <h1>Transkript Aracı</h1>
     <p>Kişisel arşivinize erişmek için giriş yapın</p>
   </div>
 
-  <div class="card">
-    <p class="card-title">Giriş Yap</p>
+  <div class="card auth-card">
+    <p class="auth-title">Giriş Yap</p>
 
     <div class="field">
       <label class="field-label" for="email">E-posta adresi</label>
-      <div class="input-wrap">
-        <input type="email" id="email" placeholder="ornek@mail.com" autocomplete="email">
-      </div>
+      <input class="inp" type="email" id="email" placeholder="ornek@mail.com" autocomplete="email">
     </div>
 
     <div class="field">
       <label class="field-label" for="password">Şifre</label>
-      <div class="input-wrap">
-        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
-        <button class="eye-btn" id="eye-btn" type="button" tabindex="-1" aria-label="Şifreyi göster">
-          <svg id="eye-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          <svg id="eye-off-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
+      <div class="inp-wrap">
+        <input class="inp" type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+        <button class="eye-btn" id="eye-btn" type="button" tabindex="-1">
+          <svg id="eye-on" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg id="eye-off" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
       </div>
     </div>
 
-    <label class="remember-row" for="remember">
-      <input type="checkbox" id="remember" checked>
-      <span class="check-box">
-        <svg class="check-icon" width="10" height="10" viewBox="0 0 12 12" fill="none">
-          <path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </span>
-      <span class="check-label">Beni hatırla</span>
-    </label>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+      <label class="cb-row" for="remember">
+        <input type="checkbox" id="remember" checked>
+        <span class="cb-box">
+          <svg class="cb-check" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="cb-label">Beni hatırla</span>
+      </label>
+      <a href="/forgot" style="font-size:.8rem;color:var(--text-3);text-decoration:none;transition:color .15s;" onmouseover="this.style.color='var(--text-2)'" onmouseout="this.style.color='var(--text-3)'">Şifremi unuttum</a>
+    </div>
 
-    <button class="btn-primary" id="login-btn">Giriş Yap</button>
-    <div class="error-msg" id="error-msg"></div>
+    <button class="btn btn-primary btn-full" id="login-btn">Giriş Yap</button>
+    <div id="msg" style="margin-top:.875rem;display:none;"></div>
 
     <div class="divider">veya</div>
-
-    <div class="footer-links">
-      Hesabın yok mu?
-      <a href="/register" class="primary-link">Kayıt ol</a>
-    </div>
+    <div class="auth-footer">Hesabın yok mu? <a href="/register" class="la">Kayıt ol</a></div>
   </div>
 
-  <div class="guest-row">
-    <a href="/">Kayıtsız devam et →</a>
-  </div>
-
+  <div class="auth-guest"><a href="/">Kayıtsız devam et →</a></div>
 </div>
 
 <script>
-let supabaseClient = null
+let sb = null
 
 async function init() {
-  const config = await fetch('/config').then(r => r.json())
-  const { createClient } = supabase
-  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key)
-  const { data: { session } } = await supabaseClient.auth.getSession()
+  const cfg = await fetch('/config').then(r => r.json())
+  sb = supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key)
+  const { data: { session } } = await sb.auth.getSession()
   if (session) { window.location.href = '/'; return }
+  initTheme()
 }
 
-// Şifre göster/gizle
-const pwInput = document.getElementById('password')
+const pw = document.getElementById('password')
 document.getElementById('eye-btn').addEventListener('click', () => {
-  const isText = pwInput.type === 'text'
-  pwInput.type = isText ? 'password' : 'text'
-  document.getElementById('eye-icon').style.display = isText ? '' : 'none'
-  document.getElementById('eye-off-icon').style.display = isText ? 'none' : ''
+  const t = pw.type === 'text'
+  pw.type = t ? 'password' : 'text'
+  document.getElementById('eye-on').style.display  = t ? '' : 'none'
+  document.getElementById('eye-off').style.display = t ? 'none' : ''
 })
 
 document.getElementById('login-btn').addEventListener('click', async () => {
   const email = document.getElementById('email').value.trim()
-  const password = pwInput.value
+  const password = pw.value
   if (!email || !password) return
 
-  const rememberMe = document.getElementById('remember').checked
-  localStorage.setItem('remember_me', rememberMe ? 'true' : 'false')
+  const rem = document.getElementById('remember').checked
+  localStorage.setItem('remember_me', rem ? 'true' : 'false')
 
   const btn = document.getElementById('login-btn')
   btn.disabled = true
-  btn.textContent = 'Giriş yapılıyor...'
+  btn.innerHTML = '<span class="spinner"></span> Giriş yapılıyor...'
 
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password })
+  const { error } = await sb.auth.signInWithPassword({ email, password })
+  const msg = document.getElementById('msg')
 
   if (error) {
-    const msg = document.getElementById('error-msg')
+    msg.className = 'alert alert-err'
     msg.textContent = 'E-posta veya şifre hatalı.'
     msg.style.display = 'block'
     btn.disabled = false
@@ -299,9 +111,7 @@ document.getElementById('login-btn').addEventListener('click', async () => {
   }
 })
 
-pwInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('login-btn').click()
-})
+pw.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-btn').click() })
 
 init()
 </script>

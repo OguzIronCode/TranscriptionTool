@@ -1,603 +1,642 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Transkript Aracı</title>
+<title>Transkript Aracı</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  nav {
-    width: 100%;
-    max-width: 720px;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 0 1.25rem;
+  /* ── Input Tabs ─────────────────── */
+  .tabs { display:flex; gap:0; background:var(--elevated); border-radius:var(--r-s); padding:3px; margin-bottom:1rem; }
+  .tab {
+    flex:1; padding:.4rem .5rem; font-size:.8rem; font-weight:600;
+    border:none; border-radius:calc(var(--r-s) - 2px); cursor:pointer;
+    background:none; color:var(--text-2); transition:all .15s;
   }
-  .nav-logo {
-    font-size: 0.9rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-decoration: none;
-  }
-  .nav-email {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    margin-left: auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 180px;
-  }
-  .nav-link {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-decoration: none;
-    padding: 0.3rem 0.6rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface2);
-  }
-  .nav-link:hover { color: var(--text); background: var(--border); }
-  .nav-btn {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    padding: 0.3rem 0.6rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    cursor: pointer;
-  }
-  .nav-btn:hover { color: var(--text); background: var(--border); }
-</style>
-<style>
-  :root {
-    --bg: #0d0d0f;
-    --surface: #18181b;
-    --surface2: #27272a;
-    --border: #3f3f46;
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --primary-dim: #6366f120;
-    --success: #22c55e;
-    --danger: #ef4444;
-    --text: #f4f4f5;
-    --text-muted: #a1a1aa;
-    --radius: 12px;
-    --radius-sm: 8px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: system-ui, -apple-system, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2rem 1rem 4rem;
-  }
-  header {
-    text-align: center;
-    margin-bottom: 2.5rem;
-  }
-  header h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  header p { color: var(--text-muted); margin-top: 0.5rem; font-size: 0.95rem; }
+  .tab.active { background:var(--surface); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  .tab:hover:not(.active) { color:var(--text); }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 720px;
-    margin-bottom: 1.25rem;
+  /* ── Drop zone ──────────────────── */
+  .dropzone {
+    border:2px dashed var(--border); border-radius:var(--r-s);
+    padding:2.75rem 1.5rem; text-align:center; cursor:pointer;
+    transition:all .2s; position:relative;
   }
+  .dropzone:hover, .dropzone.over { border-color:var(--accent); background:var(--accent-d); }
+  .dropzone input[type=file] { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+  .drop-icon { font-size:2.25rem; margin-bottom:.6rem; }
+  .drop-title { font-size:1rem; font-weight:600; margin-bottom:.2rem; }
+  .drop-sub { font-size:.82rem; color:var(--text-2); }
+  .file-info {
+    display:none; align-items:center; gap:.75rem;
+    background:var(--elevated); border-radius:var(--r-s); padding:.75rem 1rem; margin-top:1rem;
+  }
+  .file-icon { font-size:1.3rem; }
+  .file-name { font-weight:500; font-size:.875rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-size { font-size:.78rem; color:var(--text-3); }
+  .file-remove { margin-left:auto; cursor:pointer; color:var(--text-3); background:none; border:none; font-size:1.1rem; padding:.2rem; border-radius:4px; transition:color .15s; }
+  .file-remove:hover { color:var(--err); }
 
-  /* Drop Zone */
-  #dropzone {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 3rem 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
+  /* ── Mic ────────────────────────── */
+  .mic-area { display:flex; flex-direction:column; align-items:center; gap:.875rem; padding:1.5rem 1rem; }
+  .mic-btn {
+    width:70px; height:70px; border-radius:50%; border:2px solid var(--border);
+    background:var(--elevated); color:var(--text-2); cursor:pointer; font-size:0;
+    display:flex; align-items:center; justify-content:center; transition:all .2s;
   }
-  #dropzone:hover, #dropzone.drag-over {
-    border-color: var(--primary);
-    background: var(--primary-dim);
-  }
-  #dropzone input[type="file"] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-  }
-  .drop-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
-  .drop-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.25rem; }
-  .drop-sub { font-size: 0.85rem; color: var(--text-muted); }
+  .mic-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-d); }
+  .mic-btn.rec { border-color:var(--err); color:var(--err); background:var(--err-d); animation:pulse 1.2s ease-out infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(196,88,88,.35)} 70%{box-shadow:0 0 0 14px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+  .mic-timer { font-size:1.4rem; font-weight:700; letter-spacing:.05em; color:var(--text-3); font-variant-numeric:tabular-nums; }
+  .mic-timer.on { color:var(--err); }
+  .mic-hint { font-size:.8rem; color:var(--text-3); text-align:center; }
 
-  #file-info {
-    display: none;
-    align-items: center;
-    gap: 0.75rem;
-    background: var(--surface2);
-    border-radius: var(--radius-sm);
-    padding: 0.75rem 1rem;
-    margin-top: 1rem;
-  }
-  #file-info .file-icon { font-size: 1.4rem; }
-  #file-info .file-name { font-weight: 500; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #file-info .file-size { font-size: 0.8rem; color: var(--text-muted); }
-  #file-info .remove-btn { margin-left: auto; cursor: pointer; color: var(--text-muted); background: none; border: none; font-size: 1.1rem; padding: 0.25rem; }
-  #file-info .remove-btn:hover { color: var(--danger); }
+  /* ── URL ────────────────────────── */
+  .url-area { padding:.375rem 0; }
+  .url-hint { font-size:.775rem; color:var(--text-3); margin-top:.5rem; }
 
-  /* Options */
-  .options-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+  /* ── Options ────────────────────── */
+  .options-row { display:flex; gap:.75rem; flex-wrap:wrap; }
+  .option-group { flex:1; min-width:120px; }
+  .opt-select {
+    width:100%; background:var(--elevated); border:1px solid var(--border);
+    border-radius:var(--r-s); color:var(--text); padding:.62rem .875rem;
+    font-size:.875rem; outline:none; cursor:pointer; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5d78' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right .7rem center; padding-right:2rem;
+    transition:border-color .15s;
   }
-  @media (max-width: 480px) { .options-grid { grid-template-columns: 1fr; } }
-  .option-group label {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.4rem;
-  }
-  select {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    padding: 0.6rem 0.8rem;
-    font-size: 0.9rem;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.6rem center;
-    cursor: pointer;
-  }
-  select:focus { outline: none; border-color: var(--primary); }
+  .opt-select:focus { border-color:var(--focus); }
 
-  /* Button */
-  #transcribe-btn {
-    width: 100%;
-    padding: 0.85rem;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+  /* ── Transcribe btn ─────────────── */
+  .transcribe-btn {
+    width:100%; padding:.9rem; background:var(--accent); color:#fff;
+    border:none; border-radius:var(--r-s); font-size:1rem; font-weight:600;
+    cursor:pointer; transition:background .15s, transform .1s;
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
   }
-  #transcribe-btn:hover:not(:disabled) { background: var(--primary-hover); }
-  #transcribe-btn:active:not(:disabled) { transform: scale(0.99); }
-  #transcribe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .transcribe-btn:hover:not(:disabled) { background:var(--accent-h); }
+  .transcribe-btn:active:not(:disabled) { transform:scale(.99); }
+  .transcribe-btn:disabled { opacity:.45; cursor:not-allowed; }
 
-  /* Status */
-  #status { display: none; margin-top: 1rem; }
-  .status-inner {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.9rem;
-  }
-  .status-inner.loading { background: var(--primary-dim); color: var(--text); }
-  .status-inner.error { background: #ef444420; color: #fca5a5; }
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2.5px solid #ffffff30;
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    flex-shrink: 0;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  /* ── Status ─────────────────────── */
+  #status { display:none; margin-top:1rem; }
+  .status-box { display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem; border-radius:var(--r-s); font-size:.875rem; }
+  .status-box.loading { background:var(--accent-d); color:var(--text); }
+  .status-box.error   { background:var(--err-d); color:var(--err); }
 
-  /* Result */
-  #result { display: none; }
-  .result-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .result-header h2 { font-size: 1rem; font-weight: 700; }
-  .lang-badge {
-    font-size: 0.75rem;
-    padding: 0.2rem 0.6rem;
-    background: var(--primary-dim);
-    color: #a5b4fc;
-    border-radius: 99px;
-    border: 1px solid #6366f140;
-  }
-  .result-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-  .btn-sm {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text);
-    transition: background 0.15s;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-  .btn-sm:hover { background: var(--border); }
-  .btn-sm.primary { background: var(--primary); border-color: var(--primary); }
-  .btn-sm.primary:hover { background: var(--primary-hover); }
+  /* ── Result ─────────────────────── */
+  #result { display:none; }
+  .result-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.875rem; flex-wrap:wrap; gap:.5rem; }
+  .result-title { font-size:1rem; font-weight:700; display:flex; align-items:center; gap:.5rem; }
+  .result-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
 
-  /* Toggle */
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-  }
-  .toggle {
-    position: relative; display: inline-block; width: 36px; height: 20px;
-  }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .slider {
-    position: absolute; cursor: pointer; inset: 0;
-    background: var(--border); border-radius: 20px; transition: 0.2s;
-  }
-  .slider:before {
-    content: ""; position: absolute;
-    width: 14px; height: 14px; left: 3px; bottom: 3px;
-    background: white; border-radius: 50%; transition: 0.2s;
-  }
-  input:checked + .slider { background: var(--primary); }
-  input:checked + .slider:before { transform: translateX(16px); }
+  .ts-row { display:flex; align-items:center; gap:.5rem; margin-bottom:.75rem; font-size:.82rem; color:var(--text-3); }
+  .toggle { position:relative; display:inline-block; width:34px; height:19px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:20px; transition:.2s; }
+  .slider:before { content:""; position:absolute; width:13px; height:13px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+  input:checked + .slider { background:var(--accent); }
+  input:checked + .slider:before { transform:translateX(15px); }
 
-  /* Transcript text */
-  #transcript-text {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 1rem;
-    font-size: 0.9rem;
-    line-height: 1.7;
-    max-height: 400px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
+  .transcript-body {
+    background:var(--elevated); border:1px solid var(--border); border-radius:var(--r-s);
+    padding:1rem; font-size:.875rem; line-height:1.75; white-space:pre-wrap;
+    word-break:break-word; max-height:420px; overflow-y:auto;
   }
-  #transcript-text .segment {
-    margin-bottom: 0.5rem;
-  }
-  #transcript-text .ts {
-    font-size: 0.75rem;
-    color: var(--primary);
-    font-family: monospace;
-    margin-right: 0.4rem;
-    font-weight: 600;
-  }
-  #transcript-text::-webkit-scrollbar { width: 6px; }
-  #transcript-text::-webkit-scrollbar-track { background: transparent; }
-  #transcript-text::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .seg-ts { font-size:.72rem; color:var(--accent); font-family:monospace; font-weight:600; margin-right:.4rem; }
+  .copy-ok { font-size:.78rem; color:var(--ok); display:none; }
 
-  .copy-feedback {
-    display: none;
-    color: var(--success);
-    font-size: 0.8rem;
-    margin-left: 0.3rem;
-  }
+  /* ── Report modal ───────────────── */
+  .rep-loading { display:flex; flex-direction:column; align-items:center; gap:.75rem; padding:1.75rem 0; color:var(--text-3); font-size:.85rem; }
+  .rep-error   { color:var(--err); font-size:.875rem; padding:.75rem 0; }
+  .rep-content { display:none; }
+  .rep-meta    { font-size:.78rem; color:var(--text-3); margin-bottom:1rem; padding-bottom:.875rem; border-bottom:1px solid var(--border); }
+  .rep-sec-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); margin-bottom:.5rem; display:flex; align-items:center; gap:.5rem; }
+  .rep-sec-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .rep-summary { font-size:.875rem; line-height:1.75; color:var(--text-2); white-space:pre-line; margin-bottom:1.125rem; }
+  .rep-points  { list-style:none; margin-bottom:1.125rem; display:flex; flex-direction:column; gap:.35rem; }
+  .rep-points li { font-size:.85rem; color:var(--text-2); line-height:1.55; display:flex; gap:.55rem; align-items:flex-start; }
+  .rep-points li::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; margin-top:.5rem; }
+  .rep-kws  { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:1.25rem; }
+  .rep-kw   { font-size:.72rem; padding:.2rem .55rem; border-radius:99px; background:var(--accent-d); border:1px solid rgba(91,106,209,.22); color:#8b80e0; }
+  .rep-dl-row { display:flex; gap:.45rem; padding-top:.875rem; border-top:1px solid var(--border); }
+  .modal-close-btn { background:none; border:none; cursor:pointer; color:var(--text-3); font-size:1.4rem; line-height:1; padding:2px 5px; border-radius:4px; transition:color .15s; }
+  .modal-close-btn:hover { color:var(--text); }
+  .modal-scroll { max-height:62vh; overflow-y:auto; padding-right:2px; }
+
+  /* ── Header ─────────────────────── */
+  .hero { text-align:center; padding:2.5rem 0 2rem; }
+  .hero h1 { font-size:1.85rem; font-weight:800; letter-spacing:-.03em; background:linear-gradient(135deg,var(--text) 0%,var(--text-2) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .hero p { color:var(--text-2); margin-top:.5rem; font-size:.925rem; }
 </style>
 </head>
 <body>
 
-<nav>
-  <a href="/" class="nav-logo">Transkript Aracı</a>
-  <span class="nav-email" id="nav-email"></span>
-  <a href="/archive" class="nav-link" id="nav-archive" style="display:none">Arşiv</a>
-  <button class="nav-btn" id="logout-btn" style="display:none">Çıkış</button>
-  <a href="/login" class="nav-link" id="nav-login" style="display:none">Giriş Yap</a>
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">Transkript Aracı</a>
+    <div class="nav-sep"></div>
+    <span class="nav-email" id="nav-email"></span>
+    <a href="/archive" class="nav-link" id="nav-archive" style="display:none">Arşiv</a>
+    <a href="/profile" class="nav-link" id="nav-profile" style="display:none">Profil</a>
+    <button class="nav-btn" id="logout-btn" style="display:none">Çıkış</button>
+    <a href="/login" class="nav-link" id="nav-login" style="display:none">Giriş Yap</a>
+    <button class="theme-btn" id="theme-btn" title="Gece/gündüz modu">
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
 </nav>
 
-<header>
-  <h1>Video Transkript Aracı</h1>
-  <p>Yerel video veya ses dosyasından metin çıkar — Whisper ile, tarayıcıda çalışır</p>
-</header>
-
-<!-- Upload -->
-<div class="card">
-  <div id="dropzone">
-    <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.avi,.webm,.mp3,.wav,.m4a,.flac,.ogg">
-    <div class="drop-icon">🎬</div>
-    <div class="drop-title">Dosyayı buraya sürükle veya tıkla</div>
-    <div class="drop-sub">MP4 · MKV · AVI · MOV · WEBM · MP3 · WAV · M4A · FLAC</div>
+<div class="page">
+  <div class="hero">
+    <h1>Video Transkript Aracı</h1>
+    <p>Video veya ses dosyasından saniyeler içinde metin çıkar — Whisper ile</p>
   </div>
-  <div id="file-info">
-    <span class="file-icon">🎞️</span>
-    <div>
-      <div class="file-name" id="file-name-text"></div>
-      <div class="file-size" id="file-size-text"></div>
+
+  <!-- Upload / Mic / URL Card -->
+  <div class="card" style="padding:1.25rem;margin-bottom:1rem;">
+    <div class="tabs">
+      <button class="tab active" data-panel="file-panel">📁 Dosya Yükle</button>
+      <button class="tab" data-panel="mic-panel">🎙️ Mikrofon</button>
+      <button class="tab" data-panel="url-panel">🔗 YouTube / URL</button>
     </div>
-    <button class="remove-btn" id="remove-btn" title="Kaldır">✕</button>
+
+    <!-- Dosya -->
+    <div class="tab-panel active" id="file-panel">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept="video/*,audio/*,.mkv,.avi,.webm,.mp3,.wav,.m4a,.flac,.ogg">
+        <div class="drop-icon" id="drop-icon">🎬</div>
+        <div class="drop-title">Dosyayı buraya sürükle veya tıkla</div>
+        <div class="drop-sub">MP4 · MKV · AVI · MOV · WEBM · MP3 · WAV · M4A · FLAC</div>
+      </div>
+      <div class="file-info" id="file-info">
+        <span class="file-icon">🎞️</span>
+        <div style="min-width:0;flex:1;">
+          <div class="file-name" id="file-name-text"></div>
+          <div class="file-size" id="file-size-text"></div>
+        </div>
+        <button class="file-remove" id="remove-btn" title="Kaldır">✕</button>
+      </div>
+    </div>
+
+    <!-- Mikrofon -->
+    <div class="tab-panel" id="mic-panel">
+      <div class="mic-area">
+        <button class="mic-btn" id="mic-btn">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+        <div class="mic-timer" id="mic-timer">00:00</div>
+        <div class="mic-hint" id="mic-hint">Kayıt başlatmak için tıkla</div>
+      </div>
+    </div>
+
+    <!-- URL -->
+    <div class="tab-panel" id="url-panel">
+      <div class="url-area">
+        <input class="inp" type="url" id="url-input" placeholder="https://youtube.com/watch?v=...">
+        <p class="url-hint">YouTube, Twitter/X ve diğer video platformları desteklenir.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="card" style="padding:1.25rem;margin-bottom:1rem;">
+    <div class="options-row">
+      <div class="option-group">
+        <label class="field-label">Dil</label>
+        <select class="opt-select" id="lang-select">
+          <option value="auto">Otomatik Algıla</option>
+          <option value="tr">Türkçe</option>
+          <option value="en">İngilizce</option>
+          <option value="de">Almanca</option>
+          <option value="fr">Fransızca</option>
+          <option value="es">İspanyolca</option>
+          <option value="it">İtalyanca</option>
+          <option value="pt">Portekizce</option>
+          <option value="ru">Rusça</option>
+          <option value="ja">Japonca</option>
+          <option value="ko">Korece</option>
+          <option value="zh">Çince</option>
+          <option value="ar">Arapça</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transcribe -->
+  <div style="margin-bottom:1rem;">
+    <button class="transcribe-btn" id="transcribe-btn" disabled>Transkript Oluştur</button>
+    <div id="status">
+      <div class="status-box loading" id="status-box">
+        <span class="spinner"></span>
+        <span id="status-text">İşleniyor...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="card" id="result" style="padding:1.25rem;">
+    <div class="result-header">
+      <div class="result-title">
+        Transkript
+        <span class="badge badge-accent" id="lang-badge"></span>
+      </div>
+      <div class="result-actions">
+        <button class="btn btn-ghost btn-sm" id="copy-btn">📋 Kopyala <span class="copy-ok" id="copy-ok">✓</span></button>
+        <button class="btn btn-ghost btn-sm" id="dl-txt-btn">↓ TXT</button>
+        <button class="btn btn-primary btn-sm" id="dl-srt-btn">↓ SRT</button>
+        <button class="btn btn-ghost btn-sm" id="report-btn">📊 Rapor</button>
+      </div>
+    </div>
+    <div class="ts-row">
+      <label class="toggle"><input type="checkbox" id="ts-toggle" checked><span class="slider"></span></label>
+      Zaman damgaları
+    </div>
+    <div class="transcript-body" id="transcript-text"></div>
   </div>
 </div>
 
-<!-- Options -->
-<div class="card">
-  <div class="options-grid" style="grid-template-columns:1fr;">
-    <div class="option-group">
-      <label>Dil</label>
-      <select id="lang-select">
-        <option value="auto">Otomatik Algıla</option>
-        <option value="tr">Türkçe</option>
-        <option value="en">İngilizce</option>
-        <option value="de">Almanca</option>
-        <option value="fr">Fransızca</option>
-        <option value="es">İspanyolca</option>
-        <option value="it">İtalyanca</option>
-        <option value="pt">Portekizce</option>
-        <option value="ru">Rusça</option>
-        <option value="ja">Japonca</option>
-        <option value="ko">Korece</option>
-        <option value="zh">Çince</option>
-        <option value="ar">Arapça</option>
-      </select>
+<!-- Report modal -->
+<div class="modal-overlay" id="rep-modal">
+  <div class="modal" style="max-width:560px;width:100%;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;">
+      <div>
+        <p class="modal-title" id="rep-title" style="margin-bottom:.15rem;">Transkript Raporu</p>
+        <p style="font-size:.78rem;color:var(--text-3);" id="rep-sub"></p>
+      </div>
+      <button class="modal-close-btn" id="rep-close">×</button>
+    </div>
+    <div class="modal-scroll">
+      <div class="rep-loading" id="rep-loading">
+        <span class="spinner" style="color:var(--accent);"></span>
+        <span>Rapor hazırlanıyor...</span>
+      </div>
+      <div class="rep-error" id="rep-error" style="display:none;"></div>
+      <div class="rep-content" id="rep-content">
+        <div class="rep-meta" id="rep-meta"></div>
+        <div class="rep-sec-title">Özet</div>
+        <div class="rep-summary" id="rep-summary"></div>
+        <div class="rep-sec-title">Temel Noktalar</div>
+        <ul class="rep-points" id="rep-points"></ul>
+        <div class="rep-sec-title">Anahtar Kelimeler</div>
+        <div class="rep-kws" id="rep-kws"></div>
+        <div class="rep-dl-row">
+          <button class="btn btn-ghost btn-sm" id="rep-txt">↓ TXT olarak indir</button>
+          <button class="btn btn-primary btn-sm" id="rep-pdf">↓ PDF olarak indir</button>
+        </div>
+      </div>
     </div>
   </div>
-</div>
-
-<!-- Transcribe Button -->
-<div style="width:100%;max-width:720px;margin-bottom:1.25rem;">
-  <button id="transcribe-btn" disabled>Transkript Oluştur</button>
-  <div id="status">
-    <div class="status-inner loading" id="status-inner">
-      <div class="spinner"></div>
-      <span id="status-text">İşleniyor...</span>
-    </div>
-  </div>
-</div>
-
-<!-- Result -->
-<div class="card" id="result">
-  <div class="result-header">
-    <div style="display:flex;align-items:center;gap:0.5rem;">
-      <h2>Transkript</h2>
-      <span class="lang-badge" id="lang-badge"></span>
-    </div>
-    <div class="result-actions">
-      <button class="btn-sm" id="copy-btn">📋 Kopyala <span class="copy-feedback" id="copy-feedback">✓ Kopyalandı</span></button>
-      <button class="btn-sm" id="dl-txt-btn">⬇ TXT</button>
-      <button class="btn-sm primary" id="dl-srt-btn">⬇ SRT</button>
-    </div>
-  </div>
-  <div class="toggle-row">
-    <label class="toggle">
-      <input type="checkbox" id="ts-toggle" checked>
-      <span class="slider"></span>
-    </label>
-    Zaman damgalarını göster
-  </div>
-  <div id="transcript-text"></div>
 </div>
 
 <script>
-let supabaseClient = null
-let currentSession = null
+let sb = null, session = null, activeMode = 'file', selectedFile = null, micBlob = null, transcriptData = null
 
+// ── Auth ──────────────────────────────────────────────────
 async function initAuth() {
-  const config = await fetch('/config').then(r => r.json())
-  const { createClient } = supabase
-  const rememberMe = localStorage.getItem('remember_me') !== 'false'
-  supabaseClient = createClient(config.supabase_url, config.supabase_anon_key, {
-    auth: { storage: rememberMe ? localStorage : sessionStorage, persistSession: true }
+  const cfg = await fetch('/config').then(r => r.json())
+  const rem = localStorage.getItem('remember_me') !== 'false'
+  sb = supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+    auth: { storage: rem ? localStorage : sessionStorage, persistSession: true }
   })
-
-  const { data: { session } } = await supabaseClient.auth.getSession()
-  if (session) {
-    currentSession = session
-    const username = session.user.user_metadata?.username || session.user.email
-    document.getElementById('nav-email').textContent = username
+  const { data: { session: s } } = await sb.auth.getSession()
+  if (s) {
+    session = s
+    document.getElementById('nav-email').textContent = s.user.user_metadata?.username || s.user.email
     document.getElementById('nav-archive').style.display = ''
+    document.getElementById('nav-profile').style.display = ''
     document.getElementById('logout-btn').style.display = ''
   } else {
     document.getElementById('nav-login').style.display = ''
   }
+  initTheme()
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await supabaseClient.auth.signOut()
-  window.location.href = '/login'
+  await sb.auth.signOut(); window.location.href = '/login'
+})
+
+// ── Tabs ──────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
+    tab.classList.add('active')
+    document.getElementById(tab.dataset.panel).classList.add('active')
+    activeMode = tab.dataset.panel.replace('-panel', '')
+    clearFile(); updateBtn()
+  })
+})
+
+function updateBtn() {
+  const btn = document.getElementById('transcribe-btn')
+  if (activeMode === 'file') btn.disabled = !selectedFile
+  else if (activeMode === 'mic') btn.disabled = !micBlob
+  else btn.disabled = !(document.getElementById('url-input').value.trim())
+}
+document.getElementById('url-input').addEventListener('input', updateBtn)
+
+// ── File drop ────────────────────────────────────────────
+const fileInput = document.getElementById('file-input')
+const dropzone  = document.getElementById('dropzone')
+const fileInfo  = document.getElementById('file-info')
+
+function setFile(file) {
+  selectedFile = file
+  document.getElementById('file-name-text').textContent = file.name
+  document.getElementById('file-size-text').textContent = fmtBytes(file.size)
+  fileInfo.style.display = 'flex'
+  document.getElementById('drop-icon').textContent = '✅'
+  document.getElementById('result').style.display = 'none'
+  document.getElementById('status').style.display = 'none'
+  updateBtn()
+}
+function clearFile() {
+  selectedFile = null; micBlob = null
+  fileInput.value = ''; fileInfo.style.display = 'none'
+  document.getElementById('drop-icon').textContent = '🎬'
+  document.getElementById('transcribe-btn').disabled = true
+}
+fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]) })
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over') })
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'))
+dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('over'); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]) })
+document.getElementById('remove-btn').addEventListener('click', clearFile)
+
+// ── Mic ───────────────────────────────────────────────────
+let mediaRecorder = null, micChunks = [], micSec = 0, micInterval = null
+const micBtn   = document.getElementById('mic-btn')
+const micTimer = document.getElementById('mic-timer')
+const micHint  = document.getElementById('mic-hint')
+
+const MIC_SVG  = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`
+const STOP_SVG = `<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`
+
+micBtn.addEventListener('click', async () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopMic()
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      micChunks = []; micBlob = null; micSec = 0
+      micTimer.textContent = '00:00'; micTimer.classList.add('on')
+      micHint.textContent = 'Kayıt devam ediyor... durdurmak için tıkla'
+      micBtn.classList.add('rec'); micBtn.innerHTML = STOP_SVG
+      mediaRecorder = new MediaRecorder(stream)
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) micChunks.push(e.data) }
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        micBlob = new Blob(micChunks, { type: 'audio/webm' })
+        micHint.textContent = `Kayıt hazır (${fmtMic(micSec)}) — transkript oluşturmak için butona bas`
+        micTimer.classList.remove('on'); updateBtn()
+      }
+      mediaRecorder.start(200)
+      micInterval = setInterval(() => { micSec++; micTimer.textContent = fmtMic(micSec) }, 1000)
+    } catch { micHint.textContent = 'Mikrofon erişimi reddedildi.' }
+  }
+})
+function stopMic() {
+  if (mediaRecorder) mediaRecorder.stop()
+  clearInterval(micInterval)
+  micBtn.classList.remove('rec'); micBtn.innerHTML = MIC_SVG
+}
+
+// ── Transcribe ────────────────────────────────────────────
+document.getElementById('transcribe-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('transcribe-btn')
+  const statusEl = document.getElementById('status')
+  const statusBox = document.getElementById('status-box')
+  const statusText = document.getElementById('status-text')
+
+  btn.disabled = true; statusEl.style.display = 'block'
+  statusBox.className = 'status-box loading'
+  statusText.textContent = 'Hazırlanıyor...'
+  document.getElementById('result').style.display = 'none'
+
+  const headers = session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+
+  try {
+    let res
+    if (activeMode === 'url') {
+      const url = document.getElementById('url-input').value.trim()
+      statusText.textContent = 'Video indiriliyor...'
+      setTimeout(() => { statusText.textContent = 'Ses sıkıştırılıyor ve işleniyor...' }, 3000)
+      res = await fetch('/transcribe-url', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, language: document.getElementById('lang-select').value })
+      })
+    } else {
+      const file = activeMode === 'mic'
+        ? new File([micBlob], 'kayit.webm', { type: 'audio/webm' })
+        : selectedFile
+      statusText.textContent = activeMode === 'mic' ? 'Kayıt işleniyor...' : 'Dosya yükleniyor...'
+      setTimeout(() => { statusText.textContent = 'Ses sıkıştırılıyor ve Groq API\'ye gönderiliyor...' }, 2000)
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('language', document.getElementById('lang-select').value)
+      res = await fetch('/transcribe', { method: 'POST', body: fd, headers })
+    }
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail || 'Sunucu hatası')
+    transcriptData = data
+    document.getElementById('lang-badge').textContent =
+      `${data.language.toUpperCase()} · %${Math.round((data.language_probability || 1) * 100)}`
+    renderTranscript()
+    statusEl.style.display = 'none'
+    document.getElementById('result').style.display = 'block'
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  } catch (err) {
+    statusBox.className = 'status-box error'
+    statusBox.innerHTML = `<span>❌ ${err.message}</span>`
+  } finally {
+    btn.disabled = false
+  }
+})
+
+// ── Render ────────────────────────────────────────────────
+function renderTranscript() {
+  if (!transcriptData) return
+  const el = document.getElementById('transcript-text')
+  if (document.getElementById('ts-toggle').checked && transcriptData.segments?.length) {
+    el.innerHTML = transcriptData.segments.map(s =>
+      `<div><span class="seg-ts">[${fmtTime(s.start)}]</span>${esc(s.text)}</div>`
+    ).join('')
+  } else {
+    el.textContent = transcriptData.text
+  }
+}
+document.getElementById('ts-toggle').addEventListener('change', renderTranscript)
+
+document.getElementById('copy-btn').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(transcriptData?.text || '')
+  const ok = document.getElementById('copy-ok')
+  ok.style.display = 'inline'; setTimeout(() => { ok.style.display = 'none' }, 2000)
+})
+document.getElementById('dl-txt-btn').addEventListener('click', () => {
+  if (transcriptData) dl(transcriptData.text, 'transkript.txt', 'text/plain')
+})
+document.getElementById('dl-srt-btn').addEventListener('click', () => {
+  if (!transcriptData) return
+  const srt = transcriptData.segments.map((s, i) =>
+    `${i+1}\n${srtT(s.start)} --> ${srtT(s.end)}\n${s.text}\n`
+  ).join('\n')
+  dl(srt, 'transkript.srt', 'text/plain')
+})
+
+// ── Helpers ───────────────────────────────────────────────
+function fmtBytes(b) { return b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB' }
+function fmtMic(s)   { return `${pad(Math.floor(s/60))}:${pad(s%60)}` }
+function fmtTime(s)  { const m=Math.floor(s/60); return `${pad(m)}:${pad(Math.floor(s%60))}` }
+function srtT(s)     { return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(Math.floor(s%60))},${pad(Math.round((s%1)*1000),3)}` }
+function pad(n, l=2) { return String(n).padStart(l,'0') }
+function esc(s)      { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function dl(content, name, type) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([content], { type }))
+  a.download = name; a.click(); URL.revokeObjectURL(a.href)
+}
+
+// ── Report ────────────────────────────────────────────────
+let currentReport = null
+
+document.getElementById('report-btn').addEventListener('click', () => {
+  if (!transcriptData) return
+  const filename = selectedFile?.name
+    || document.getElementById('url-input').value.split('/').filter(Boolean).pop()
+    || 'transkript'
+  currentReport = { filename, language: transcriptData.language }
+  document.getElementById('rep-title').textContent = filename
+  document.getElementById('rep-sub').textContent = ''
+  document.getElementById('rep-loading').style.display = 'flex'
+  document.getElementById('rep-error').style.display = 'none'
+  document.getElementById('rep-content').style.display = 'none'
+  document.getElementById('rep-modal').classList.add('open')
+  loadReport()
+})
+
+async function loadReport() {
+  try {
+    const headers = { 'Content-Type': 'application/json' }
+    if (session) headers['Authorization'] = `Bearer ${session.access_token}`
+    const res = await fetch('/summarize', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        text: transcriptData.text,
+        filename: currentReport.filename,
+        language: currentReport.language
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail || 'Özetleme başarısız')
+    currentReport = { ...currentReport, ...data }
+    renderReport(data)
+  } catch (err) {
+    document.getElementById('rep-loading').style.display = 'none'
+    document.getElementById('rep-error').style.display = 'block'
+    document.getElementById('rep-error').textContent = '❌ ' + err.message
+  }
+}
+
+function renderReport(data) {
+  document.getElementById('rep-loading').style.display = 'none'
+  document.getElementById('rep-content').style.display = 'block'
+  document.getElementById('rep-sub').textContent = [
+    (data.language || '').toUpperCase(),
+    data.word_count ? data.word_count.toLocaleString('tr-TR') + ' kelime' : ''
+  ].filter(Boolean).join(' · ')
+  document.getElementById('rep-meta').textContent = [
+    data.filename ? '📄 ' + data.filename : '',
+    data.language ? '🌐 ' + data.language.toUpperCase() : '',
+    data.word_count ? '📝 ' + data.word_count.toLocaleString('tr-TR') + ' kelime' : '',
+  ].filter(Boolean).join('   ·   ')
+  document.getElementById('rep-summary').textContent = data.summary || ''
+  document.getElementById('rep-points').innerHTML = (data.key_points || []).map(p => `<li>${esc(p)}</li>`).join('')
+  document.getElementById('rep-kws').innerHTML = (data.keywords || []).map(k => `<span class="rep-kw">${esc(k)}</span>`).join('')
+}
+
+document.getElementById('rep-close').addEventListener('click', () => document.getElementById('rep-modal').classList.remove('open'))
+document.getElementById('rep-modal').addEventListener('click', e => { if (e.target.id === 'rep-modal') document.getElementById('rep-modal').classList.remove('open') })
+
+document.getElementById('rep-txt').addEventListener('click', () => {
+  const r = currentReport; if (!r?.summary) return
+  const txt = [
+    '══════════════════════════════════════════════',
+    '   TRANSKRİPT ANALİZ RAPORU',
+    '══════════════════════════════════════════════',
+    '',
+    `Dosya        : ${r.filename || '—'}`,
+    `Dil          : ${(r.language || '').toUpperCase() || '—'}`,
+    `Kelime sayısı: ${r.word_count?.toLocaleString('tr-TR') || '—'}`,
+    `Tarih        : ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+    '',
+    '──────────────────────────────────────────────',
+    'ÖZET',
+    '──────────────────────────────────────────────',
+    '',
+    r.summary || '',
+    '',
+    '──────────────────────────────────────────────',
+    'TEMEL NOKTALAR',
+    '──────────────────────────────────────────────',
+    '',
+    ...(r.key_points || []).map((p, i) => `  ${i + 1}. ${p}`),
+    '',
+    '──────────────────────────────────────────────',
+    'ANAHTAR KELİMELER',
+    '──────────────────────────────────────────────',
+    '',
+    '  ' + (r.keywords || []).join('  ·  '),
+    '',
+    '══════════════════════════════════════════════',
+    '   Transkript Aracı',
+    '══════════════════════════════════════════════',
+  ].join('\n')
+  dl(txt, (r.filename?.replace(/\.[^.]+$/, '') || 'rapor') + '_rapor.txt', 'text/plain')
+})
+
+document.getElementById('rep-pdf').addEventListener('click', () => {
+  const r = currentReport; if (!r?.summary) return
+  const pts = (r.key_points || []).map(p => `<li>${esc(p)}</li>`).join('')
+  const kws = (r.keywords || []).map(k => `<span class="kw">${esc(k)}</span>`).join('')
+  const dateStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+  const win = window.open('', '_blank')
+  win.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<title>Rapor — ${esc(r.filename || '')}</title><style>
+body{font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:40px auto;padding:0 24px;color:#1a1a1e;line-height:1.6;}
+h1{font-size:1.15rem;font-weight:700;margin-bottom:.2rem;}
+.sub{font-size:.75rem;color:#888;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:2px solid #5b6ad1;}
+h2{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5b6ad1;margin:1.25rem 0 .5rem;display:flex;align-items:center;gap:.5rem;}
+h2::after{content:'';flex:1;height:1px;background:#e0e3f0;}
+.sum{font-size:.875rem;line-height:1.75;color:#333;white-space:pre-line;}
+ul{list-style:none;padding:0;}
+li{font-size:.875rem;line-height:1.6;color:#333;padding-left:1.1rem;position:relative;margin-bottom:.3rem;}
+li::before{content:"\\2022";color:#5b6ad1;position:absolute;left:0;}
+.kws{display:flex;flex-wrap:wrap;gap:.35rem;}
+.kw{font-size:.75rem;padding:.2rem .55rem;border-radius:99px;background:#f0f2fb;border:1px solid #d0d5f0;color:#5b6ad1;}
+.footer{margin-top:2rem;padding-top:.75rem;border-top:1px solid #eee;font-size:.7rem;color:#bbb;text-align:center;}
+@media print{body{margin:0;}}
+</style></head><body>
+<h1>${esc(r.filename || 'Transkript')}</h1>
+<div class="sub">🌐 ${(r.language || '').toUpperCase()} &nbsp;·&nbsp; 📝 ${(r.word_count || 0).toLocaleString('tr-TR')} kelime &nbsp;·&nbsp; 📅 ${dateStr}</div>
+<h2>Özet</h2><div class="sum">${esc(r.summary || '')}</div>
+<h2>Temel Noktalar</h2><ul>${pts}</ul>
+<h2>Anahtar Kelimeler</h2><div class="kws">${kws}</div>
+<div class="footer">Transkript Aracı — ${dateStr}</div>
+</body></html>`)
+  win.document.close()
+  setTimeout(() => { win.focus(); win.print() }, 600)
 })
 
 initAuth()
-
-const fileInput = document.getElementById('file-input');
-const dropzone = document.getElementById('dropzone');
-const fileInfo = document.getElementById('file-info');
-const fileNameText = document.getElementById('file-name-text');
-const fileSizeText = document.getElementById('file-size-text');
-const removeBtn = document.getElementById('remove-btn');
-const transcribeBtn = document.getElementById('transcribe-btn');
-const status = document.getElementById('status');
-const statusInner = document.getElementById('status-inner');
-const statusText = document.getElementById('status-text');
-const result = document.getElementById('result');
-const transcriptText = document.getElementById('transcript-text');
-const langBadge = document.getElementById('lang-badge');
-const tsToggle = document.getElementById('ts-toggle');
-const copyBtn = document.getElementById('copy-btn');
-const copyFeedback = document.getElementById('copy-feedback');
-const dlTxtBtn = document.getElementById('dl-txt-btn');
-const dlSrtBtn = document.getElementById('dl-srt-btn');
-const langSelect = document.getElementById('lang-select');
-
-let selectedFile = null;
-let transcriptData = null;
-
-function formatBytes(bytes) {
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-function formatTime(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
-  return `${pad(m)}:${pad(s)}`;
-}
-
-function pad(n, len = 2) {
-  return String(n).padStart(len, '0');
-}
-
-function formatSRTTime(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.round((seconds % 1) * 1000);
-  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
-}
-
-function setFile(file) {
-  selectedFile = file;
-  fileNameText.textContent = file.name;
-  fileSizeText.textContent = formatBytes(file.size);
-  fileInfo.style.display = 'flex';
-  dropzone.querySelector('.drop-icon').textContent = '✅';
-  transcribeBtn.disabled = false;
-  result.style.display = 'none';
-  status.style.display = 'none';
-}
-
-function clearFile() {
-  selectedFile = null;
-  fileInput.value = '';
-  fileInfo.style.display = 'none';
-  dropzone.querySelector('.drop-icon').textContent = '🎬';
-  transcribeBtn.disabled = true;
-}
-
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) setFile(e.target.files[0]);
-});
-
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
-dropzone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropzone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) setFile(file);
-});
-removeBtn.addEventListener('click', clearFile);
-
-transcribeBtn.addEventListener('click', async () => {
-  if (!selectedFile) return;
-
-  transcribeBtn.disabled = true;
-  status.style.display = 'block';
-  statusInner.className = 'status-inner loading';
-  statusText.textContent = 'Dosya yükleniyor...';
-  result.style.display = 'none';
-
-  const formData = new FormData();
-  formData.append('file', selectedFile);
-  formData.append('language', langSelect.value);
-
-  try {
-    setTimeout(() => { statusText.textContent = 'Ses sıkıştırılıyor ve Groq API\'ye gönderiliyor...'; }, 2000);
-
-    const headers = currentSession ? { 'Authorization': `Bearer ${currentSession.access_token}` } : {}
-    const res = await fetch('/transcribe', { method: 'POST', body: formData, headers });
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.detail || 'Sunucu hatası');
-
-    transcriptData = data;
-    langBadge.textContent = `${data.language.toUpperCase()} — %${Math.round(data.language_probability * 100)}`;
-    renderTranscript();
-    status.style.display = 'none';
-    result.style.display = 'block';
-    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  } catch (err) {
-    statusInner.className = 'status-inner error';
-    statusInner.innerHTML = `<span>❌ ${err.message}</span>`;
-  } finally {
-    transcribeBtn.disabled = false;
-  }
-});
-
-function renderTranscript() {
-  if (!transcriptData) return;
-  const showTs = tsToggle.checked;
-  if (showTs) {
-    transcriptText.innerHTML = transcriptData.segments.map(seg => {
-      const ts = `[${formatTime(seg.start)}]`;
-      return `<div class="segment"><span class="ts">${ts}</span>${escapeHtml(seg.text)}</div>`;
-    }).join('');
-  } else {
-    transcriptText.textContent = transcriptData.text;
-  }
-}
-
-tsToggle.addEventListener('change', renderTranscript);
-
-function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-copyBtn.addEventListener('click', async () => {
-  const text = transcriptData?.text || '';
-  await navigator.clipboard.writeText(text);
-  copyFeedback.style.display = 'inline';
-  setTimeout(() => { copyFeedback.style.display = 'none'; }, 2000);
-});
-
-dlTxtBtn.addEventListener('click', () => {
-  if (!transcriptData) return;
-  download(transcriptData.text, 'transkript.txt', 'text/plain');
-});
-
-dlSrtBtn.addEventListener('click', () => {
-  if (!transcriptData) return;
-  const srt = transcriptData.segments.map((seg, i) => {
-    return `${i + 1}\n${formatSRTTime(seg.start)} --> ${formatSRTTime(seg.end)}\n${seg.text}\n`;
-  }).join('\n');
-  download(srt, 'transkript.srt', 'text/plain');
-});
-
-function download(content, filename, type) {
-  const blob = new Blob([content], { type });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
 </script>
 </body>
 </html>
