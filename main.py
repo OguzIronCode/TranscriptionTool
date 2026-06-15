@@ -203,6 +203,11 @@ async def login_page():
     return FileResponse("static/login.html")
 
 
+@app.get("/register")
+async def register_page():
+    return FileResponse("static/register.html")
+
+
 @app.get("/archive")
 async def archive_page():
     return FileResponse("static/archive.html")

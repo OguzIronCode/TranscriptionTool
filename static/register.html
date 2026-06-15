@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Giriş — Transkript Aracı</title>
+<title>Kayıt Ol — Transkript Aracı</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -20,6 +20,7 @@
     --text-sub: #a1a1aa;
     --text-muted: #71717a;
     --danger: #f87171;
+    --success: #4ade80;
     --radius: 14px;
     --radius-sm: 9px;
   }
@@ -45,7 +46,6 @@
     gap: 1.75rem;
   }
 
-  /* Logo */
   .brand { text-align: center; }
   .brand-icon {
     width: 44px; height: 44px;
@@ -55,15 +55,9 @@
     margin: 0 auto 0.75rem;
     font-size: 1.3rem;
   }
-  .brand h1 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--text);
-  }
+  .brand h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
   .brand p { font-size: 0.85rem; color: var(--text-sub); margin-top: 0.25rem; }
 
-  /* Kart */
   .card {
     width: 100%;
     background: var(--card);
@@ -72,40 +66,18 @@
     padding: 1.75rem;
     box-shadow: 0 0 0 1px #ffffff04, 0 8px 40px #00000060;
   }
+  .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 1.5rem; }
 
-  .card-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--text);
-  }
-
-  /* Form */
   .field { margin-bottom: 1rem; }
-  .field-label {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-sub);
-    margin-bottom: 0.4rem;
-  }
+  .field-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-sub); margin-bottom: 0.4rem; }
   .input-wrap { position: relative; }
   .input-wrap input {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    padding: 0.65rem 0.875rem;
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    -webkit-appearance: none;
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    padding: 0.65rem 0.875rem; font-size: 0.9rem; outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none;
   }
-  .input-wrap input:focus {
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px #6366f118;
-  }
+  .input-wrap input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px #6366f118; }
   .input-wrap input::placeholder { color: var(--text-muted); }
   .eye-btn {
     position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
@@ -114,80 +86,58 @@
     padding: 0; transition: color 0.15s;
   }
   .eye-btn:hover { color: var(--text-sub); }
-  .input-wrap input[type="password"] { padding-right: 2.5rem; }
-  .input-wrap input[type="text"].has-eye { padding-right: 2.5rem; }
+  .input-wrap input[type="password"],
+  .input-wrap input.has-eye { padding-right: 2.5rem; }
 
-  /* Beni hatırla */
-  .remember-row {
-    display: flex; align-items: center; gap: 0.6rem;
-    margin-bottom: 1.25rem; cursor: pointer; user-select: none;
+  /* Şifre güç göstergesi */
+  .strength-bar {
+    display: flex; gap: 4px; margin-top: 0.5rem; height: 3px;
   }
-  .remember-row input[type="checkbox"] { display: none; }
-  .check-box {
-    width: 17px; height: 17px; flex-shrink: 0;
-    border: 1.5px solid var(--border);
-    border-radius: 5px;
-    background: var(--surface);
-    display: grid; place-items: center;
-    transition: all 0.15s;
+  .strength-bar span {
+    flex: 1; border-radius: 99px; background: var(--border);
+    transition: background 0.2s;
   }
-  .remember-row input:checked + .check-box {
-    background: var(--primary); border-color: var(--primary);
-  }
-  .check-icon { display: none; }
-  .remember-row input:checked + .check-box .check-icon { display: block; }
-  .check-label { font-size: 0.85rem; color: var(--text-sub); }
+  .strength-bar.weak span:nth-child(1) { background: #f87171; }
+  .strength-bar.fair span:nth-child(1),
+  .strength-bar.fair span:nth-child(2) { background: #fb923c; }
+  .strength-bar.good span:nth-child(1),
+  .strength-bar.good span:nth-child(2),
+  .strength-bar.good span:nth-child(3) { background: #facc15; }
+  .strength-bar.strong span { background: #4ade80; }
+  .strength-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; }
 
-  /* Buton */
   .btn-primary {
     width: 100%; padding: 0.72rem;
-    background: var(--primary); color: #fff;
-    border: none; border-radius: var(--radius-sm);
-    font-size: 0.9rem; font-weight: 600;
+    background: var(--primary); color: #fff; border: none;
+    border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 600;
     cursor: pointer; transition: background 0.15s, transform 0.1s;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.01em; margin-top: 0.25rem;
   }
   .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
   .btn-primary:active:not(:disabled) { transform: scale(0.99); }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Hata */
-  .error-msg {
+  .message {
     display: none; margin-top: 0.875rem;
-    padding: 0.65rem 0.875rem;
-    background: #f8717112; border: 1px solid #f8717130;
-    border-radius: var(--radius-sm);
-    font-size: 0.825rem; color: var(--danger);
+    padding: 0.65rem 0.875rem; border-radius: var(--radius-sm); font-size: 0.825rem;
   }
+  .message.error   { background: #f8717112; border: 1px solid #f8717130; color: var(--danger); }
+  .message.success { background: #4ade8012; border: 1px solid #4ade8030; color: var(--success); }
 
-  /* Divider */
   .divider {
     display: flex; align-items: center; gap: 0.75rem;
     margin: 1.25rem 0; color: var(--text-muted); font-size: 0.8rem;
   }
-  .divider::before, .divider::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
-  }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-  /* Footer linkler */
   .footer-links { text-align: center; }
-  .footer-links a {
-    font-size: 0.85rem; color: var(--text-sub);
-    text-decoration: none; transition: color 0.15s;
-  }
+  .footer-links a { font-size: 0.85rem; color: var(--text-sub); text-decoration: none; transition: color 0.15s; }
   .footer-links a:hover { color: var(--text); }
   .footer-links a.primary-link { color: var(--primary); }
   .footer-links a.primary-link:hover { color: #818cf8; }
 
-  .guest-row {
-    text-align: center;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-  }
-  .guest-row a {
-    color: var(--text-muted); text-decoration: none;
-    border-bottom: 1px dashed var(--border); transition: color 0.15s;
-  }
+  .guest-row { text-align: center; font-size: 0.82rem; color: var(--text-muted); }
+  .guest-row a { color: var(--text-muted); text-decoration: none; border-bottom: 1px dashed var(--border); transition: color 0.15s; }
   .guest-row a:hover { color: var(--text-sub); }
 </style>
 </head>
@@ -197,11 +147,18 @@
   <div class="brand">
     <div class="brand-icon">🎙️</div>
     <h1>Transkript Aracı</h1>
-    <p>Kişisel arşivinize erişmek için giriş yapın</p>
+    <p>Ücretsiz hesap oluşturun</p>
   </div>
 
   <div class="card">
-    <p class="card-title">Giriş Yap</p>
+    <p class="card-title">Kayıt Ol</p>
+
+    <div class="field">
+      <label class="field-label" for="username">Kullanıcı adı</label>
+      <div class="input-wrap">
+        <input type="text" id="username" placeholder="kullaniciadi" autocomplete="username">
+      </div>
+    </div>
 
     <div class="field">
       <label class="field-label" for="email">E-posta adresi</label>
@@ -213,7 +170,7 @@
     <div class="field">
       <label class="field-label" for="password">Şifre</label>
       <div class="input-wrap">
-        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+        <input type="password" id="password" placeholder="En az 6 karakter" autocomplete="new-password">
         <button class="eye-btn" id="eye-btn" type="button" tabindex="-1" aria-label="Şifreyi göster">
           <svg id="eye-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -225,26 +182,19 @@
           </svg>
         </button>
       </div>
+      <div class="strength-bar" id="strength-bar">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="strength-hint" id="strength-hint"></p>
     </div>
 
-    <label class="remember-row" for="remember">
-      <input type="checkbox" id="remember" checked>
-      <span class="check-box">
-        <svg class="check-icon" width="10" height="10" viewBox="0 0 12 12" fill="none">
-          <path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </span>
-      <span class="check-label">Beni hatırla</span>
-    </label>
+    <button class="btn-primary" id="register-btn">Hesap Oluştur</button>
+    <div class="message" id="msg"></div>
 
-    <button class="btn-primary" id="login-btn">Giriş Yap</button>
-    <div class="error-msg" id="error-msg"></div>
-
-    <div class="divider">veya</div>
+    <div class="divider">zaten hesabın var mı?</div>
 
     <div class="footer-links">
-      Hesabın yok mu?
-      <a href="/register" class="primary-link">Kayıt ol</a>
+      <a href="/login" class="primary-link">Giriş yap</a>
     </div>
   </div>
 
@@ -274,33 +224,73 @@ document.getElementById('eye-btn').addEventListener('click', () => {
   document.getElementById('eye-off-icon').style.display = isText ? 'none' : ''
 })
 
-document.getElementById('login-btn').addEventListener('click', async () => {
+// Şifre güç göstergesi
+const strengthLevels = [
+  { label: '', cls: '' },
+  { label: 'Zayıf', cls: 'weak' },
+  { label: 'Orta', cls: 'fair' },
+  { label: 'İyi', cls: 'good' },
+  { label: 'Güçlü', cls: 'strong' },
+]
+
+function getStrength(pw) {
+  if (!pw) return 0
+  let score = 0
+  if (pw.length >= 6) score++
+  if (pw.length >= 10) score++
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++
+  if (/[0-9]/.test(pw) || /[^A-Za-z0-9]/.test(pw)) score++
+  return Math.min(score, 4)
+}
+
+pwInput.addEventListener('input', () => {
+  const score = getStrength(pwInput.value)
+  const bar = document.getElementById('strength-bar')
+  const hint = document.getElementById('strength-hint')
+  bar.className = 'strength-bar ' + (strengthLevels[score].cls || '')
+  hint.textContent = pwInput.value ? strengthLevels[score].label : ''
+})
+
+// Mesaj
+function showMsg(text, type) {
+  const el = document.getElementById('msg')
+  el.textContent = text
+  el.className = `message ${type}`
+  el.style.display = 'block'
+}
+
+document.getElementById('register-btn').addEventListener('click', async () => {
+  const username = document.getElementById('username').value.trim()
   const email = document.getElementById('email').value.trim()
   const password = pwInput.value
-  if (!email || !password) return
 
-  const rememberMe = document.getElementById('remember').checked
-  localStorage.setItem('remember_me', rememberMe ? 'true' : 'false')
+  if (!username || !email || !password) { showMsg('Tüm alanları doldurun.', 'error'); return }
+  if (password.length < 6) { showMsg('Şifre en az 6 karakter olmalı.', 'error'); return }
 
-  const btn = document.getElementById('login-btn')
+  const btn = document.getElementById('register-btn')
   btn.disabled = true
-  btn.textContent = 'Giriş yapılıyor...'
+  btn.textContent = 'Hesap oluşturuluyor...'
 
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabaseClient.auth.signUp({
+    email, password,
+    options: { data: { username } }
+  })
 
   if (error) {
-    const msg = document.getElementById('error-msg')
-    msg.textContent = 'E-posta veya şifre hatalı.'
-    msg.style.display = 'block'
+    showMsg(error.message, 'error')
     btn.disabled = false
-    btn.textContent = 'Giriş Yap'
-  } else {
+    btn.textContent = 'Hesap Oluştur'
+  } else if (data.session) {
     window.location.href = '/'
+  } else {
+    showMsg('Hesabınız oluşturuldu! E-postanızdaki doğrulama linkine tıklayın, ardından giriş yapabilirsiniz.', 'success')
+    btn.disabled = false
+    btn.textContent = 'Hesap Oluştur'
   }
 })
 
 pwInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('login-btn').click()
+  if (e.key === 'Enter') document.getElementById('register-btn').click()
 })
 
 init()
