@@ -6,7 +6,6 @@
 <title>Transkript Aracı</title>
 <script src="/static/theme.js"></script>
 <link rel="stylesheet" href="/static/style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
 <style>
   /* ── Input Tabs ─────────────────── */
   .tabs { display:flex; gap:0; background:var(--elevated); border-radius:var(--r-s); padding:3px; margin-bottom:1rem; }
@@ -133,6 +132,7 @@
   .hero { text-align:center; padding:2.5rem 0 2rem; }
   .hero h1 { font-size:1.85rem; font-weight:800; letter-spacing:-.03em; background:linear-gradient(135deg,var(--text) 0%,var(--text-2) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
   .hero p { color:var(--text-2); margin-top:.5rem; font-size:.925rem; }
+  .hero .privacy-note { font-size:.78rem; color:var(--text-3); }
 </style>
 </head>
 <body>
@@ -141,11 +141,6 @@
   <div class="nav-inner">
     <a href="/" class="nav-logo">Transkript Aracı</a>
     <div class="nav-sep"></div>
-    <span class="nav-email" id="nav-email"></span>
-    <a href="/archive" class="nav-link" id="nav-archive" style="display:none">Arşiv</a>
-    <a href="/profile" class="nav-link" id="nav-profile" style="display:none">Profil</a>
-    <button class="nav-btn" id="logout-btn" style="display:none">Çıkış</button>
-    <a href="/login" class="nav-link" id="nav-login" style="display:none">Giriş Yap</a>
     <button class="theme-btn" id="theme-btn" title="Gece/gündüz modu">
       <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -157,6 +152,7 @@
   <div class="hero">
     <h1>Video Transkript Aracı</h1>
     <p>Video veya ses dosyasından saniyeler içinde metin çıkar — Whisper ile</p>
+    <p class="privacy-note">Hesap gerekmez. Dosyalarınız ve transkriptleriniz sunucuda saklanmaz; sonucu indirmeyi unutmayın.</p>
   </div>
 
   <!-- Upload / Mic / URL Card -->
@@ -296,31 +292,7 @@
 </div>
 
 <script>
-let sb = null, session = null, activeMode = 'file', selectedFile = null, micBlob = null, transcriptData = null
-
-// ── Auth ──────────────────────────────────────────────────
-async function initAuth() {
-  const cfg = await fetch('/config').then(r => r.json())
-  const rem = localStorage.getItem('remember_me') !== 'false'
-  sb = supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
-    auth: { storage: rem ? localStorage : sessionStorage, persistSession: true }
-  })
-  const { data: { session: s } } = await sb.auth.getSession()
-  if (s) {
-    session = s
-    document.getElementById('nav-email').textContent = s.user.user_metadata?.username || s.user.email
-    document.getElementById('nav-archive').style.display = ''
-    document.getElementById('nav-profile').style.display = ''
-    document.getElementById('logout-btn').style.display = ''
-  } else {
-    document.getElementById('nav-login').style.display = ''
-  }
-  initTheme()
-}
-
-document.getElementById('logout-btn').addEventListener('click', async () => {
-  await sb.auth.signOut(); window.location.href = '/login'
-})
+let activeMode = 'file', selectedFile = null, micBlob = null, transcriptData = null
 
 // ── Tabs ──────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
@@ -421,8 +393,6 @@ document.getElementById('transcribe-btn').addEventListener('click', async () => 
   statusText.textContent = 'Hazırlanıyor...'
   document.getElementById('result').style.display = 'none'
 
-  const headers = session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
-
   try {
     let res
     if (activeMode === 'url') {
@@ -431,7 +401,7 @@ document.getElementById('transcribe-btn').addEventListener('click', async () => 
       setTimeout(() => { statusText.textContent = 'Ses sıkıştırılıyor ve işleniyor...' }, 3000)
       res = await fetch('/transcribe-url', {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, language: document.getElementById('lang-select').value })
       })
     } else {
@@ -444,7 +414,7 @@ document.getElementById('transcribe-btn').addEventListener('click', async () => 
       const fd = new FormData()
       fd.append('file', file)
       fd.append('language', document.getElementById('lang-select').value)
-      res = await fetch('/transcribe', { method: 'POST', body: fd, headers })
+      res = await fetch('/transcribe', { method: 'POST', body: fd })
     }
 
     const data = await res.json()
@@ -453,12 +423,7 @@ document.getElementById('transcribe-btn').addEventListener('click', async () => 
     document.getElementById('lang-badge').textContent =
       `${data.language.toUpperCase()} · %${Math.round((data.language_probability || 1) * 100)}`
     renderTranscript()
-    if (session && data.saved === false) {
-      statusBox.className = 'status-box error'
-      statusBox.textContent = '⚠️ Transkript hazır, ancak arşivinize kaydedilemedi. Metni kopyalayıp indirmeyi unutmayın.'
-    } else {
-      statusEl.style.display = 'none'
-    }
+    statusEl.style.display = 'none'
     document.getElementById('result').style.display = 'block'
     document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -533,10 +498,8 @@ document.getElementById('report-btn').addEventListener('click', () => {
 
 async function loadReport() {
   try {
-    const headers = { 'Content-Type': 'application/json' }
-    if (session) headers['Authorization'] = `Bearer ${session.access_token}`
     const res = await fetch('/summarize', {
-      method: 'POST', headers,
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: transcriptData.text,
         filename: currentReport.filename,
@@ -644,7 +607,7 @@ li::before{content:"\\2022";color:#5b6ad1;position:absolute;left:0;}
   setTimeout(() => { win.focus(); win.print() }, 600)
 })
 
-initAuth()
+initTheme()
 </script>
 </body>
 </html>

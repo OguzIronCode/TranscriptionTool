@@ -3,13 +3,6 @@ import os
 from dataclasses import dataclass
 
 
-def _bool(name: str, default: bool) -> bool:
-    raw = os.environ.get(name)
-    if raw is None or raw.strip() == "":
-        return default
-    return raw.strip().lower() in ("1", "true", "yes", "on", "evet")
-
-
 def _int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if raw is None or raw.strip() == "":
@@ -34,14 +27,10 @@ def _float(name: str, default: float) -> float:
 class Settings:
     # Zorunlu
     groq_api_key: str
-    supabase_url: str
-    supabase_anon_key: str
-    supabase_service_key: str
 
-    # Erişim ve kötüye kullanım koruması
-    allow_anonymous: bool = True          # False: transkripsiyon için giriş zorunlu
-    rate_anon_per_hour: int = 5           # giriş yapmamış kullanıcı (IP başına)
-    rate_user_per_hour: int = 40          # giriş yapmış kullanıcı (hesap başına)
+    # Kötüye kullanım koruması (IP başına, saatlik)
+    rate_per_hour: int = 10               # transkripsiyon istekleri
+    rate_summary_per_hour: int = 30       # özet istekleri
     url_allowed_hosts: tuple[str, ...] = ()   # boş: tüm genel (public) adresler
 
     # Kaynak sınırları
@@ -56,17 +45,11 @@ class Settings:
     # Modeller
     summary_model: str = "openai/gpt-oss-120b"   # llama-3.3-70b-versatile Groq'ta kaldırıldı
 
-    # Diğer
-    debug: bool = False                   # True: /docs açık
-
 
 def load_settings() -> Settings:
-    missing = [
-        name for name in ("GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY")
-        if not os.environ.get(name, "").strip()
-    ]
-    if missing:
-        raise RuntimeError("Eksik ortam değişkenleri: " + ", ".join(missing))
+    key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not key:
+        raise RuntimeError("Eksik ortam değişkeni: GROQ_API_KEY")
 
     hosts = tuple(
         h.strip().lower().lstrip(".")
@@ -74,18 +57,13 @@ def load_settings() -> Settings:
         if h.strip()
     )
     return Settings(
-        groq_api_key=os.environ["GROQ_API_KEY"].strip(),
-        supabase_url=os.environ["SUPABASE_URL"].strip().rstrip("/"),
-        supabase_anon_key=os.environ["SUPABASE_ANON_KEY"].strip(),
-        supabase_service_key=os.environ["SUPABASE_SERVICE_KEY"].strip(),
-        allow_anonymous=_bool("ALLOW_ANONYMOUS", True),
-        rate_anon_per_hour=_int("RATE_ANON_PER_HOUR", 5),
-        rate_user_per_hour=_int("RATE_USER_PER_HOUR", 40),
+        groq_api_key=key,
+        rate_per_hour=_int("RATE_PER_HOUR", 10),
+        rate_summary_per_hour=_int("RATE_SUMMARY_PER_HOUR", 30),
         url_allowed_hosts=hosts,
         max_upload_bytes=_int("MAX_UPLOAD_MB", 500) * 1024 * 1024,
         max_concurrent_jobs=max(1, _int("MAX_CONCURRENT_JOBS", 2)),
         job_queue_timeout=_float("JOB_QUEUE_TIMEOUT", 30.0),
         max_media_seconds=_int("MAX_MEDIA_SECONDS", 4 * 3600),
         summary_model=os.environ.get("SUMMARY_MODEL", "").strip() or "openai/gpt-oss-120b",
-        debug=_bool("DEBUG", False),
     )

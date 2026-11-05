@@ -8,7 +8,6 @@ from app.audio import normalize_language
 from app.config import load_settings
 from app.limits import RateLimiter
 from app.urlcheck import UnsafeUrl, validate_public_url
-from tests.conftest import ENV
 
 
 # ── RateLimiter ──────────────────────────────────────────────
@@ -110,27 +109,29 @@ def test_normalize_language():
             normalize_language(bad)
 
 
-def test_settings_missing_env_lists_names(monkeypatch):
-    for k in ENV:
-        monkeypatch.delenv(k, raising=False)
+def test_settings_missing_key(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     with pytest.raises(RuntimeError) as e:
         load_settings()
-    assert "GROQ_API_KEY" in str(e.value) and "SUPABASE_SERVICE_KEY" in str(e.value)
+    assert "GROQ_API_KEY" in str(e.value)
+
+
+def test_settings_defaults(env):
+    s = load_settings()
+    assert s.rate_per_hour == 10 and s.rate_summary_per_hour == 30
+    assert s.max_upload_bytes == 500 * 1024 * 1024 and s.summary_model == "openai/gpt-oss-120b"
 
 
 def test_settings_parsing(env):
-    env.setenv("ALLOW_ANONYMOUS", "false")
     env.setenv("MAX_UPLOAD_MB", "10")
+    env.setenv("RATE_PER_HOUR", "3")
     env.setenv("URL_ALLOWED_HOSTS", "YouTube.com, .youtu.be ,")
-    env.setenv("SUPABASE_URL", "https://x.supabase.co/")
     s = load_settings()
-    assert s.allow_anonymous is False
-    assert s.max_upload_bytes == 10 * 1024 * 1024
+    assert s.max_upload_bytes == 10 * 1024 * 1024 and s.rate_per_hour == 3
     assert s.url_allowed_hosts == ("youtube.com", "youtu.be")
-    assert s.supabase_url == "https://x.supabase.co"
 
 
 def test_settings_bad_number(env):
-    env.setenv("RATE_ANON_PER_HOUR", "abc")
+    env.setenv("RATE_PER_HOUR", "abc")
     with pytest.raises(RuntimeError):
         load_settings()
