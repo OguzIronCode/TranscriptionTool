@@ -47,7 +47,7 @@ A full-stack audio and video transcription web application powered by **Groq API
 - **Export** — download as plain **.TXT** or **.SRT** subtitle file, or copy to clipboard
 
 ### AI Summarization & Reports
-- **One-click summary** — sends transcript text to Groq `llama-3.3-70b-versatile` via structured JSON mode
+- **One-click summary** — sends transcript text to Groq `openai/gpt-oss-120b` (configurable via `SUMMARY_MODEL`) via structured JSON mode
 - **Structured output** — returns a paragraph-level **summary**, a bulleted list of **key points** (5–10 items), and **keywords** (8–15 terms)
 - **Report download** — formatted **.TXT** report with a fixed template (header, date, language, word count, all three sections)
 - **PDF download** — opens a print-optimised HTML page in a new tab and triggers `window.print()` → "Save as PDF"
@@ -100,7 +100,7 @@ Browser
   │       └─ Groq Whisper Large v3 → segments + language
   │
   ├─ POST /summarize         → AI report generation
-  │       └─ Groq llama-3.3-70b-versatile (JSON mode)
+  │       └─ Groq chat model (JSON mode, SUMMARY_MODEL)
   │
   ├─ GET    /transcripts     → list user's transcripts (Supabase RLS)
   ├─ PUT    /transcripts/:id → update text / filename / tags
@@ -141,7 +141,7 @@ Original file (any size / format)
 | Backend | **FastAPI** (Python 3.10+) | REST API, static file serving |
 | Async runtime | **uvicorn** | ASGI server |
 | Transcription | **Groq API** — Whisper Large v3 | STT model |
-| Summarization | **Groq API** — llama-3.3-70b-versatile | LLM, JSON mode |
+| Summarization | **Groq API** — openai/gpt-oss-120b (configurable) | LLM, JSON mode |
 | Audio processing | **ffmpeg** | Compression, format conversion |
 | Video download | **yt-dlp** | YouTube / URL audio extraction |
 | Auth + Database | **Supabase** (PostgreSQL + GoTrue) | Users, sessions, transcripts table |
@@ -276,7 +276,7 @@ Generate an AI summary, key points, and keywords from a transcript.
 }
 ```
 
-Requires minimum 20 words. Uses `llama-3.3-70b-versatile` with `response_format: json_object`.
+Requires minimum 20 words. Uses the configured `SUMMARY_MODEL` with `response_format: json_object`.
 
 ---
 
@@ -511,6 +511,7 @@ Open [http://localhost:8000](http://localhost:8000)
 | `MAX_MEDIA_SECONDS` | `14400` | Longest video accepted via URL |
 | `URL_ALLOWED_HOSTS` | *(empty)* | Comma-separated host allowlist for URL downloads (e.g. `youtube.com,youtu.be`). Empty = any public host |
 | `YTDLP_YOUTUBE_CLIENTS` | *(empty)* | Optional yt-dlp YouTube player clients (e.g. `android,ios`) |
+| `SUMMARY_MODEL` | `openai/gpt-oss-120b` | Groq chat model used for summaries |
 | `LOG_LEVEL` | `INFO` | Python log level |
 
 ---

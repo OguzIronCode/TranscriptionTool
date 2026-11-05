@@ -53,6 +53,9 @@ class Settings:
     ffmpeg_timeout: float = 900.0
     download_timeout: float = 600.0
 
+    # Modeller
+    summary_model: str = "openai/gpt-oss-120b"   # llama-3.3-70b-versatile Groq'ta kaldırıldı
+
     # Diğer
     debug: bool = False                   # True: /docs açık
 
@@ -83,5 +86,6 @@ def load_settings() -> Settings:
         max_concurrent_jobs=max(1, _int("MAX_CONCURRENT_JOBS", 2)),
         job_queue_timeout=_float("JOB_QUEUE_TIMEOUT", 30.0),
         max_media_seconds=_int("MAX_MEDIA_SECONDS", 4 * 3600),
+        summary_model=os.environ.get("SUMMARY_MODEL", "").strip() or "openai/gpt-oss-120b",
         debug=_bool("DEBUG", False),
     )

@@ -347,3 +347,18 @@ def test_download_cancel_hook_stops_download(monkeypatch):
     with tempfile.TemporaryDirectory() as d, pytest.raises(DownloadCancelled):
         monkeypatch.setattr(main.yt_dlp, "YoutubeDL", FakeYDL)
         main._download_media("https://example.com/v", d, s, cancel)
+
+
+def test_summary_model_is_configurable(make_client):
+    c = make_client(SUMMARY_MODEL="openai/gpt-oss-20b")
+    seen = {}
+
+    async def spy(**kw):
+        seen.update(kw)
+        import json, types
+        content = json.dumps({"summary": "s", "key_points": [], "keywords": []})
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=content))])
+
+    c.app.state.groq.chat.completions.create = spy
+    assert c.post("/summarize", json={"text": LONG}).status_code == 200
+    assert seen["model"] == "openai/gpt-oss-20b" and seen["reasoning_effort"] == "low"

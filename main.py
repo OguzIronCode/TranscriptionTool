@@ -383,8 +383,10 @@ Transkript:
 </transkript>"""
 
     try:
+        settings: Settings = request.app.state.settings
+        extra = {"reasoning_effort": "low"} if "gpt-oss" in settings.summary_model else {}
         api_resp = await request.app.state.groq.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=settings.summary_model,
             messages=[
                 {
                     "role": "system",
@@ -395,6 +397,7 @@ Transkript:
             response_format={"type": "json_object"},
             max_tokens=2000,
             temperature=0.3,
+            **extra,
         )
         result = json.loads(api_resp.choices[0].message.content)
     except Exception:
