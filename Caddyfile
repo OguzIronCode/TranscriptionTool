@@ -2,9 +2,14 @@
 {$DOMAIN} {
 	encode gzip
 
-	# Yükleme sınırı uygulamadaki 500 MB ile aynı
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Yükleme sınırı uygulamadaki MAX_UPLOAD_MB (varsayılan 500) ile uyumlu
 	request_body {
-		max_size 500MB
+		max_size 510MB
 	}
 
 	reverse_proxy app:8000 {

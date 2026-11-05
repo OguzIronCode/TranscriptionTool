@@ -33,7 +33,24 @@ docker compose up -d --build
 ```
 `yt-dlp` YouTube değişikliklerine yetişmek için sık güncellenmelidir. Her `--build` en güncel sürümü kurar; YouTube indirme hata verirse `docker compose build --no-cache app && docker compose up -d`.
 
+## Herkese açık yayın için önerilen `.env` ayarları
+```env
+ALLOW_ANONYMOUS=false                  # transkripsiyon için giriş zorunlu
+URL_ALLOWED_HOSTS=youtube.com,youtu.be # URL ile indirme sadece bu sitelerden
+MAX_CONCURRENT_JOBS=2                  # küçük VPS'te 1-2; RAM/CPU artarsa yükseltin
+```
+Uygulama varsayılan olarak giriş yapmadan da çalışır (IP başına saatte 5 istek). Yine de herkese açık sunucuda yukarıdaki ayarlar Groq kotanızı korur.
+
+## Sorun giderme
+| Belirti | Çözüm |
+|---|---|
+| Container sürekli yeniden başlıyor | `docker compose logs app`: "Eksik ortam değişkenleri" varsa `.env`'i tamamlayın |
+| Sertifika alınamıyor | DNS A kaydı VPS IP'sine işaret ediyor mu, 80/443 açık mı? (`docker compose logs caddy`) |
+| Mikrofon çalışmıyor | Siteyi `https://` ile açın |
+| 429 hatası | Saatlik limit; `RATE_*` değişkenleriyle ayarlanır, giriş yapan kullanıcının limiti daha yüksektir |
+| URL ile transkript çalışmıyor | YouTube sunucu IP'lerini engelleyebilir ya da yt-dlp eskidi: `docker compose build --no-cache app && docker compose up -d` |
+
 ## Notlar
 - `.env` içindeki anahtarları kimseyle paylaşmayın ve repoya göndermeyin.
-- Uygulama giriş yapmadan da çalışır. Herkese açık yayınlarsanız Groq kotanız başkaları tarafından tüketilebilir.
-- Datacenter IP'leri YouTube tarafından engellenebilir; URL ile transkript bu durumda çalışmayabilir (dosya yükleme etkilenmez).
+- 8000 portunu dışarı açmayın; uygulama yalnızca Caddy arkasında çalışmalıdır (compose bunu zaten böyle kurar).
+- Zamanlı güncelleme için `git pull && docker compose up -d --build` komutunu bir cron'a ekleyebilirsiniz.
