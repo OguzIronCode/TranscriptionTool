@@ -1,4 +1,10 @@
-# Ubuntu VPS'e kurulum (Docker + Caddy)
+# Ubuntu VPS'e kurulum
+
+İki yol var: **A) Docker + Caddy** (sunucuda başka site yoksa) veya **B) mevcut nginx arkasında alt yol + systemd** (sunucuda zaten bir site varsa).
+
+---
+
+## Seçenek A — Docker + Caddy
 
 Caddy HTTPS sertifikasını otomatik alır ve yeniler. Mikrofon kaydı için HTTPS şarttır.
 Veritabanı veya hesap sistemi yoktur; tek gereken bir Groq API anahtarıdır.
@@ -53,3 +59,43 @@ RATE_PER_HOUR=10                       # IP başına saatlik transkripsiyon limi
 - `.env` içindeki anahtarı kimseyle paylaşmayın ve repoya göndermeyin.
 - 8000 portunu dışarı açmayın; uygulama yalnızca Caddy arkasında çalışmalıdır (compose bunu zaten böyle kurar).
 - Zamanlı güncelleme için `git pull && docker compose up -d --build` komutunu bir cron'a ekleyebilirsiniz.
+
+---
+
+## Seçenek B — Mevcut nginx arkasında alt yol (`/transkript`), systemd ile
+
+Sunucuda 80/443'ü zaten nginx kullanıyorsa Caddy kurmayın; uygulamayı `127.0.0.1:8300`'de çalıştırıp nginx ile yayınlayın.
+Ön yüz göreli adresler kullandığı için uygulama alt yolda (`https://alanadi.com/transkript/`) ve kökte (`/`) aynen çalışır.
+
+```bash
+# 1. Gereksinimler (ffmpeg, python venv, git)
+sudo apt install -y ffmpeg python3-venv git
+
+# 2. Servis kullanıcısı ve kod
+sudo useradd --system --home /srv/transkript --shell /usr/sbin/nologin transkript
+sudo mkdir -p /srv/transkript && sudo chown transkript:transkript /srv/transkript
+sudo -u transkript git clone https://github.com/OguzIronCode/TranscriptionTool.git /srv/transkript/app
+sudo -u transkript python3 -m venv /srv/transkript/venv
+sudo -u transkript /srv/transkript/venv/bin/pip install -r /srv/transkript/app/requirements.txt
+
+# 3. Ayarlar (yalnızca servis kullanıcısı okuyabilsin)
+sudo install -m 600 -o transkript -g transkript /dev/null /srv/transkript/.env
+echo 'GROQ_API_KEY=gsk_...' | sudo tee -a /srv/transkript/.env
+echo 'URL_ALLOWED_HOSTS=youtube.com,youtu.be' | sudo tee -a /srv/transkript/.env
+
+# 4. systemd
+sudo cp /srv/transkript/app/deploy/transkript.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now transkript
+curl -s http://127.0.0.1:8300/health
+
+# 5. nginx: deploy/nginx-transkript.conf içeriğini ilgili server { } bloğuna ekleyin
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Güncelleme:
+```bash
+sudo -u transkript git -C /srv/transkript/app pull
+sudo -u transkript /srv/transkript/venv/bin/pip install -r /srv/transkript/app/requirements.txt
+sudo systemctl restart transkript
+```
+`yt-dlp` güncel kalması için: `sudo -u transkript /srv/transkript/venv/bin/pip install -U yt-dlp && sudo systemctl restart transkript`.

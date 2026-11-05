@@ -270,3 +270,12 @@ def test_summary_model_is_configurable(make_client):
     c.app.state.groq.chat.completions.create = spy
     assert c.post("/summarize", json={"text": LONG}).status_code == 200
     assert seen["model"] == "openai/gpt-oss-20b" and seen["reasoning_effort"] == "low"
+
+
+def test_frontend_uses_relative_urls_so_subpath_hosting_works(client):
+    import re
+    html = client.get("/").text
+    assert not re.search(r'(?:src|href)="/(?!/)', html), "mutlak yol var"
+    assert not re.search(r"fetch\('/", html), "mutlak fetch yolu var"
+    for rel in ("static/theme.js", "static/style.css", "transcribe", "summarize"):
+        assert rel in html

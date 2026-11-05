@@ -1,0 +1,29 @@
+[Unit]
+Description=Transkript Araci (alt yol: /transkript)
+After=network.target
+
+[Service]
+Type=simple
+User=transkript
+Group=transkript
+WorkingDirectory=/srv/transkript/app
+EnvironmentFile=/srv/transkript/.env
+Environment=HOME=/srv/transkript
+Environment=PYTHONUNBUFFERED=1
+# Yalnizca nginx (127.0.0.1) arkasinda calisir; IP bilgisi nginx'in X-Forwarded-For basligindan alinir
+ExecStart=/srv/transkript/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8300 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+# Ses sikistirma (ffmpeg) ve indirmeler gecici dosya kullanir; kaynak tuketimi sinirli tutulur
+MemoryMax=1G
+TasksMax=200
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
