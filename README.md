@@ -108,7 +108,7 @@ Testler ağ, ffmpeg ya da Groq gerektirmez (sahte servislerle çalışır).
 
 ## Sunucuya kurulum
 
-[DEPLOY.md](DEPLOY.md) iki yol anlatır: **Docker + Caddy** (otomatik HTTPS) ya da **mevcut nginx arkasında alt yol (`/transkript`) + systemd** (canlı sürümün çalıştığı düzen). Alternatif olarak `render.yaml` ile Render'a da dağıtılabilir.
+[DEPLOY.md](DEPLOY.md) iki yol anlatır: **Docker + Caddy** (otomatik HTTPS) ya da **mevcut nginx arkasında alt yol (`/transkript`) + systemd** (canlı sürümün çalıştığı düzen).
 
 ## Proje yapısı
 
@@ -120,7 +120,7 @@ app/limits.py         Bellek içi kayan pencere hız sınırlayıcı
 app/urlcheck.py       URL indirme için SSRF koruması
 static/               index.html, style.css, theme.js
 tests/                pytest paketi
-Dockerfile, docker-compose.yml, Caddyfile, DEPLOY.md, render.yaml
+Dockerfile, docker-compose.yml, Caddyfile, DEPLOY.md, deploy/
 ```
 
 ## Lisans
