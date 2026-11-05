@@ -1,9 +1,15 @@
 # Transkript Aracı
 
+**Canlı:** <https://oguzhandemirbas.com.tr/transkript/> · [Tüm araçlar](https://oguzhandemirbas.com.tr/araclar)
+
+![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.162-009688) ![Lisans](https://img.shields.io/badge/lisans-MIT-green)
+
 Video veya ses dosyasından saniyeler içinde metin çıkaran, **hesap ve veritabanı gerektirmeyen** küçük bir web uygulaması.
 Dosya yükle, mikrofonla kaydet ya da YouTube/URL yapıştır; transkripti kopyala veya **TXT / SRT** olarak indir. İstersen yapay zekâ özeti (TXT/PDF) al.
 
 **Gizlilik:** Hiçbir şey kalıcı saklanmaz. Yüklenen dosyalar işlem biter bitmez silinir, transkriptler yalnızca tarayıcında durur.
+
+> Canlı sürümde kötüye kullanımı önlemek için IP başına saatlik limit uygulanır ve URL ile indirme yalnızca belirli sitelerle (YouTube, Vimeo, X/Twitter) sınırlıdır. Kendi kurulumunuzda bu ayarlar `.env` ile değiştirilebilir.
 
 ## Özellikler
 
@@ -73,6 +79,12 @@ ffmpeg kurulumu: Windows `winget install ffmpeg`, macOS `brew install ffmpeg`, L
 
 Hatalar `{"detail": "..."}` biçiminde döner (`400` geçersiz girdi, `413` çok büyük, `429` limit, `503` meşgul).
 
+## Gizli bilgiler
+
+- API anahtarı yalnızca sunucudaki `.env` dosyasında (ya da ortam değişkeninde) tutulur; **repoya hiçbir anahtar girmez**. `.env` dosyası `.gitignore` içindedir.
+- `.env.example` yalnızca boş/örnek değerler içerir.
+- Anahtar sızdığından şüphelenirseniz [console.groq.com](https://console.groq.com) üzerinden yenileyip `.env` dosyasını güncelleyin ve servisi yeniden başlatın.
+
 ## Üretim notları
 
 - **Hız sınırı** IP başına ve bellekte tutulur (tek süreç). Tek worker ile çalıştırın.
@@ -96,7 +108,7 @@ Testler ağ, ffmpeg ya da Groq gerektirmez (sahte servislerle çalışır).
 
 ## Sunucuya kurulum
 
-Ubuntu VPS için Docker + Caddy (otomatik HTTPS) rehberi: [DEPLOY.md](DEPLOY.md). Alternatif olarak `render.yaml` ile Render'a da dağıtılabilir.
+[DEPLOY.md](DEPLOY.md) iki yol anlatır: **Docker + Caddy** (otomatik HTTPS) ya da **mevcut nginx arkasında alt yol (`/transkript`) + systemd** (canlı sürümün çalıştığı düzen). Alternatif olarak `render.yaml` ile Render'a da dağıtılabilir.
 
 ## Proje yapısı
 
