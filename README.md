@@ -57,6 +57,7 @@ ffmpeg kurulumu: Windows `winget install ffmpeg`, macOS `brew install ffmpeg`, L
 | `MAX_UPLOAD_MB` | `500` | Yükleme boyut sınırı |
 | `MAX_MEDIA_SECONDS` | `14400` | URL ile indirilen en uzun video (sn) |
 | `URL_ALLOWED_HOSTS` | *(boş)* | URL indirme için izinli siteler, virgülle (örn. `youtube.com,youtu.be`). Boş = tüm genel adresler |
+| `PUBLIC_URL` | *(boş)* | Sitenin herkese açık adresi (örn. `https://alanadi.com/transkript/`). `canonical`, Open Graph, sitemap ve robots için gerekir |
 | `SUMMARY_MODEL` | `openai/gpt-oss-120b` | Özet için Groq modeli |
 | `YTDLP_YOUTUBE_CLIENTS` | *(boş)* | İsteğe bağlı yt-dlp YouTube istemcileri (örn. `android,ios`) |
 | `LOG_LEVEL` | `INFO` | Log seviyesi |
@@ -78,7 +79,8 @@ Hatalar `{"detail": "..."}` biçiminde döner (`400` geçersiz girdi, `413` çok
 - **SSRF:** URL indirme; http(s) dışı şemaları, 80/443 dışı portları, URL içindeki şifreleri ve özel/yerel adreslere çözülen hostları reddeder. Herkese açık sunucuda `URL_ALLOWED_HOSTS` ile siteleri kısıtlamanız önerilir.
 - **Yüklemeler:** boyut ve hız kontrolleri gövde okunmadan önce yapılır; geçici dosyalar her istekten sonra silinir.
 - **Hatalar** sunucuda loglanır, kullanıcıya genel mesaj gösterilir.
-- **Başlıklar:** CSP, `nosniff`, `Referrer-Policy`, `Permissions-Policy`; HSTS Caddy ile eklenir. Sayfalar satır içi betik kullandığı için CSP `'unsafe-inline'` içerir.
+- **Başlıklar:** CSP (`script-src 'self'`: satır içi betik yok; stil için `'unsafe-inline'` açık), `nosniff`, `X-Frame-Options`, `Cross-Origin-Resource-Policy`, `Referrer-Policy`, `Permissions-Policy`; API yanıtları `no-store` + `noindex`. HSTS proxy tarafında eklenir.
+- **SEO:** başlık/açıklama, canonical, Open Graph/Twitter kartı, JSON-LD (`WebApplication` + `FAQPage`), `robots.txt`, `sitemap.xml`, paylaşım görseli (`design/og.html` → `static/og.png`).
 - **8000 portunu doğrudan yayınlamayın;** uygulama IP bilgisi için proxy'den gelen `X-Forwarded-For`'a güvenir. Caddy arkasında çalıştırın (`docker-compose.yml`).
 - **Anahtar:** herkese açık sunucuda Groq kotanız limitlerle korunur; yine de limitleri ihtiyacınıza göre ayarlayın.
 - **YouTube** sunucu IP'lerini engelleyebilir ve sık değişir; imajı yeniden derleyerek `yt-dlp`'yi güncel tutun.

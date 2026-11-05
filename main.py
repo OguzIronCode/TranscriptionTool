@@ -1,5 +1,6 @@
 import asyncio
 import glob
+import hashlib
 import json
 import logging
 import os
@@ -17,7 +18,7 @@ load_dotenv()
 
 import yt_dlp
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from groq import AsyncGroq
 from pydantic import BaseModel, Field
@@ -38,7 +39,7 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 CSP = "; ".join([
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
@@ -51,11 +52,44 @@ CSP = "; ".join([
 ])
 
 
+def asset_version() -> str:
+    """Statik dosyaların içeriğinden kısa sürüm damgası (önbellek tazelemek için)."""
+    h = hashlib.sha1()
+    for f in sorted(STATIC_DIR.glob("*")):
+        if f.is_file() and f.suffix in {".js", ".css", ".svg", ".png"}:
+            h.update(f.name.encode())
+            h.update(f.read_bytes())
+    return h.hexdigest()[:10]
+
+
+def render_index() -> str:
+    """index.html içindeki {{PUBLIC_URL}} ve {{ASSET_V}} yer tutucularını doldurur.
+    PUBLIC_URL tanımlı değilse mutlak adres gerektiren etiketler çıkarılır."""
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    public = os.environ.get("PUBLIC_URL", "").strip()
+    if public:
+        public = public.rstrip("/") + "/"
+    else:
+        html = "\n".join(l for l in html.splitlines() if "{{PUBLIC_URL}}" not in l)
+    return html.replace("{{PUBLIC_URL}}", public).replace("{{ASSET_V}}", asset_version())
+
+
+class CachedStatic(StaticFiles):
+    """Statik dosyalar için kısa süreli önbellek (adresler ?v= ile sürümlenir)."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
+
 # ── Yaşam döngüsü ──────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = load_settings()
     app.state.settings = settings
+    app.state.index_html = render_index()
     app.state.groq = AsyncGroq(api_key=settings.groq_api_key)
     app.state.slots = asyncio.Semaphore(settings.max_concurrent_jobs)
     app.state.limit_transcribe = RateLimiter(settings.rate_per_hour)
@@ -107,13 +141,32 @@ async def precheck_upload(request: Request, call_next):
     return await call_next(request)
 
 
+MAX_JSON_BYTES = 2 * 1024 * 1024        # /summarize ve /transcribe-url için üst sınır
+
+
+@app.middleware("http")
+async def limit_json_body(request: Request, call_next):
+    if request.method == "POST" and request.url.path != "/transcribe":
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_JSON_BYTES:
+            return JSONResponse({"detail": "İstek çok büyük."}, status_code=413)
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
-    response.headers.setdefault("Content-Security-Policy", CSP)
-    response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("Referrer-Policy", "no-referrer")
-    response.headers.setdefault("Permissions-Policy", "microphone=(self), camera=(), geolocation=()")
+    h = response.headers
+    h.setdefault("Content-Security-Policy", CSP)
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "no-referrer")
+    h.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    h.setdefault("Permissions-Policy", "microphone=(self), camera=(), geolocation=(), payment=(), usb=(), browsing-topics=()")
+    path = request.url.path
+    if request.method != "GET" or path == "/health":
+        h.setdefault("Cache-Control", "no-store")           # transkript içerikleri önbelleğe alınmasın
+        h.setdefault("X-Robots-Tag", "noindex")
     return response
 
 
@@ -332,8 +385,31 @@ Transkript:
 
 # ── Sayfalar ───────────────────────────────────────────────────
 @app.get("/", include_in_schema=False)
-async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+async def index(request: Request):
+    return HTMLResponse(request.app.state.index_html, headers={"Cache-Control": "no-cache"})
 
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+@app.get("/robots.txt", include_in_schema=False)
+async def robots():
+    public = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+    lines = ["User-agent: *", "Allow: /"]
+    if public:
+        lines.append(f"Sitemap: {public}/sitemap.xml")
+    return PlainTextResponse("\n".join(lines) + "\n", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap():
+    public = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+    if not public:
+        return Response(status_code=404)
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"<url><loc>{public}/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>\n"
+        "</urlset>\n"
+    )
+    return Response(xml, media_type="application/xml", headers={"Cache-Control": "public, max-age=3600"})
+
+
+app.mount("/static", CachedStatic(directory=STATIC_DIR), name="static")

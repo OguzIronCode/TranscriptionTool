@@ -56,6 +56,8 @@ def test_security_headers(client):
     csp = h["content-security-policy"]
     assert "frame-ancestors 'none'" in csp and "connect-src 'self'" in csp
     assert "http" not in csp                         # dış kaynak yok
+    assert "script-src 'self';" in csp               # satır içi betik yok
+    assert "unsafe-inline" not in csp.split("script-src")[1].split(";")[0]
     assert "microphone=(self)" in h["permissions-policy"]
 
 
@@ -275,7 +277,92 @@ def test_summary_model_is_configurable(make_client):
 def test_frontend_uses_relative_urls_so_subpath_hosting_works(client):
     import re
     html = client.get("/").text
+    js = client.get("/static/app.js").text
     assert not re.search(r'(?:src|href)="/(?!/)', html), "mutlak yol var"
-    assert not re.search(r"fetch\('/", html), "mutlak fetch yolu var"
-    for rel in ("static/theme.js", "static/style.css", "transcribe", "summarize"):
+    assert not re.search(r"fetch\('/", js), "mutlak fetch yolu var"
+    for rel in ("static/theme.js", "static/style.css", "static/app.js"):
         assert rel in html
+    for rel in ("fetch('transcribe'", "fetch('transcribe-url'", "fetch('summarize'"):
+        assert rel in js
+
+
+
+# ── SEO ──────────────────────────────────────────────────────
+PUBLIC = "https://example.com/transkript/"
+
+
+def test_seo_tags_when_public_url_set(make_client):
+    import json
+    import re
+    c = make_client(PUBLIC_URL=PUBLIC)
+    html = c.get("/").text
+    assert "{{" not in html                                           # yer tutucu kalmadı
+    assert "<title>Video ve Ses Transkript Aracı" in html
+    assert f'<link rel="canonical" href="{PUBLIC}">' in html
+    assert f'<meta property="og:url" content="{PUBLIC}">' in html
+    assert f'content="{PUBLIC}static/og.png?v=' in html
+    assert 'name="description"' in html and 'name="twitter:card"' in html and 'lang="tr"' in html
+    assert html.count("<h1") == 1
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+    data = [json.loads(b) for b in blocks]                            # geçerli JSON-LD
+    assert {d["@type"] for d in data} == {"WebApplication", "FAQPage"}
+    faq = next(d for d in data if d["@type"] == "FAQPage")
+    for q in faq["mainEntity"]:                                       # SSS görünür içerikle aynı olmalı
+        assert q["name"] in html and q["acceptedAnswer"]["text"] in html
+    app = next(d for d in data if d["@type"] == "WebApplication")
+    assert app["url"] == PUBLIC and app["isAccessibleForFree"] is True
+
+
+def test_index_without_public_url_has_no_broken_absolute_tags(client):
+    html = client.get("/").text
+    assert "{{" not in html and 'rel="canonical"' not in html and 'property="og:image"' not in html
+
+
+def test_index_has_no_inline_script_and_versions_assets(client):
+    import re
+    html = client.get("/").text
+    inline = [m for m in re.findall(r"<script(?![^>]*\bsrc=)(?![^>]*ld\+json)[^>]*>", html)]
+    assert inline == []
+    assert re.search(r"static/app\.js\?v=[0-9a-f]{10}", html)
+
+
+def test_robots_and_sitemap(make_client):
+    c = make_client(PUBLIC_URL=PUBLIC)
+    r = c.get("/robots.txt")
+    assert r.status_code == 200 and "Allow: /" in r.text and "Sitemap: https://example.com/transkript/sitemap.xml" in r.text
+    s = c.get("/sitemap.xml")
+    assert s.status_code == 200 and "<loc>https://example.com/transkript/</loc>" in s.text
+    assert s.headers["content-type"].startswith("application/xml")
+
+
+def test_sitemap_404_without_public_url(client):
+    assert client.get("/sitemap.xml").status_code == 404
+    assert "Sitemap" not in client.get("/robots.txt").text
+
+
+def test_static_assets(client):
+    for name in ("app.js", "favicon.svg", "og.png", "style.css"):
+        r = client.get(f"/static/{name}")
+        assert r.status_code == 200 and "max-age" in r.headers["cache-control"], name
+    assert client.get("/").headers["cache-control"] == "no-cache"
+
+
+# ── Güvenlik başlıkları ve sınırlar ──────────────────────────
+def test_extra_security_headers(client):
+    h = client.get("/").headers
+    assert h["x-frame-options"] == "DENY"
+    assert h["cross-origin-resource-policy"] == "same-origin"
+    assert "payment=()" in h["permissions-policy"]
+
+
+def test_api_responses_are_not_cacheable_or_indexable(client):
+    r = upload(client)
+    assert r.headers["cache-control"] == "no-store" and r.headers["x-robots-tag"] == "noindex"
+    h = client.get("/health").headers
+    assert h["cache-control"] == "no-store" and h["x-robots-tag"] == "noindex"
+    assert "x-robots-tag" not in client.get("/").headers
+
+
+def test_oversized_json_body_rejected(client):
+    r = client.post("/summarize", headers={"Content-Length": str(5 * 1024 * 1024), "Content-Type": "application/json"}, content=b"{}")
+    assert r.status_code == 413
