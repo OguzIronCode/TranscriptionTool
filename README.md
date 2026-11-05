@@ -149,7 +149,7 @@ Original file (any size / format)
 | Frontend | Vanilla HTML / CSS / JS | No framework |
 | Design system | CSS custom properties | Dark/light theme tokens |
 | Bulk download | **JSZip** (CDN) | Client-side ZIP generation |
-| Deploy | **Render** (`render.yaml`) | PaaS hosting |
+| Deploy | **Docker + Caddy** (`docker-compose.yml`) or **Render** (`render.yaml`) | VPS / PaaS hosting |
 
 ---
 
@@ -157,10 +157,21 @@ Original file (any size / format)
 
 ```
 TranscriptionTool/
-├── main.py               # FastAPI app — all endpoints
-├── requirements.txt      # Python dependencies
+├── main.py               # FastAPI app — routes, middleware, wiring
+├── app/
+│   ├── config.py         # Settings loaded from environment variables
+│   ├── audio.py          # ffmpeg compression + Groq Whisper call
+│   ├── limits.py         # In-memory sliding-window rate limiter
+│   └── urlcheck.py       # SSRF protection for URL downloads
+├── tests/                # pytest suite (fake Supabase / Groq, no network)
+├── requirements.txt      # Pinned runtime dependencies
+├── requirements-dev.txt  # + pytest, httpx
+├── Dockerfile            # python:3.12-slim + ffmpeg, non-root user
+├── docker-compose.yml    # app + Caddy (automatic HTTPS)
+├── Caddyfile             # Reverse proxy, HSTS, upload limit
+├── DEPLOY.md             # Ubuntu VPS guide
 ├── render.yaml           # Render deployment config
-├── .env                  # Local secrets (not committed)
+├── .env.example          # All environment variables
 │
 └── static/
     ├── style.css         # Shared design system (CSS tokens, components)
@@ -422,6 +433,8 @@ http://localhost:8000/reset-password
 
 ## Local Development
 
+For a VPS deployment see [DEPLOY.md](DEPLOY.md).
+
 ### Prerequisites
 
 | Tool | Version | Notes |
@@ -435,7 +448,7 @@ http://localhost:8000/reset-password
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/OguzHAN/TranscriptionTool.git
+git clone https://github.com/OguzIronCode/TranscriptionTool.git
 cd TranscriptionTool
 
 # 2. Create and activate a virtual environment
@@ -476,8 +489,53 @@ Open [http://localhost:8000](http://localhost:8000)
 
 ## Environment Variables
 
-| Variable | Required | Description |
+**Required**
+
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Groq API key for Whisper and LLM calls |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon/public key (served to the frontend via `/config`) |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key (server-side only — never expose it) |
+
+**Optional** (defaults shown; see `.env.example`)
+
+| Variable | Default | Description |
 |---|---|---|
+| `ALLOW_ANONYMOUS` | `true` | `false` requires login for transcription/summarization |
+| `RATE_ANON_PER_HOUR` | `5` | Heavy requests per hour per IP for anonymous users |
+| `RATE_USER_PER_HOUR` | `40` | Heavy requests per hour per logged-in account |
+| `MAX_CONCURRENT_JOBS` | `2` | Simultaneous transcription jobs (protects CPU/RAM) |
+| `JOB_QUEUE_TIMEOUT` | `30` | Seconds a request waits for a free slot before `503` |
+| `MAX_UPLOAD_MB` | `500` | Upload size limit |
+| `MAX_MEDIA_SECONDS` | `14400` | Longest video accepted via URL |
+| `URL_ALLOWED_HOSTS` | *(empty)* | Comma-separated host allowlist for URL downloads (e.g. `youtube.com,youtu.be`). Empty = any public host |
+| `YTDLP_YOUTUBE_CLIENTS` | *(empty)* | Optional yt-dlp YouTube player clients (e.g. `android,ios`) |
+| `LOG_LEVEL` | `INFO` | Python log level |
+
+---
+
+## Production notes
+
+- **Rate limiting** is in-memory and per process. Run a single worker (the default) or put a shared limiter in front.
+- **Abuse protection:** anonymous requests are limited per IP; set `ALLOW_ANONYMOUS=false` on a public server to require login.
+- **SSRF:** URL downloads reject non-http(s) schemes, non-80/443 ports, credentials in URLs, and any host that resolves to a private/loopback/link-local address. Use `URL_ALLOWED_HOSTS` to restrict to specific sites; this is also the best defence against redirect tricks.
+- **Uploads:** size, rate and auth checks run *before* the request body is read. Temporary files are removed after every request.
+- **Errors** are logged server-side; clients only see generic messages.
+- **Headers:** CSP, `nosniff`, `Referrer-Policy`, `Permissions-Policy`; HSTS is added by Caddy. The CSP still allows inline scripts because the pages use them.
+- **Do not publish port 8000 directly** — the app trusts `X-Forwarded-For` from its proxy for per-IP limits. Keep it behind Caddy (see `docker-compose.yml`).
+- **YouTube** often blocks datacenter IPs and changes frequently; keep `yt-dlp` current by rebuilding the image.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+The suite runs without network access, ffmpeg, Groq or Supabase (they are replaced by fakes).
+
+---|---|---|
 | `GROQ_API_KEY` | ✓ | Groq API key for Whisper and LLM calls |
 | `SUPABASE_URL` | ✓ | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | ✓ | Supabase anon/public key (used by frontend JS) |

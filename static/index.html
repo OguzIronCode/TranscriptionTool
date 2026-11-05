@@ -6,7 +6,7 @@
 <title>Transkript Aracı</title>
 <script src="/static/theme.js"></script>
 <link rel="stylesheet" href="/static/style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
 <style>
   /* ── Input Tabs ─────────────────── */
   .tabs { display:flex; gap:0; background:var(--elevated); border-radius:var(--r-s); padding:3px; margin-bottom:1rem; }
@@ -448,18 +448,23 @@ document.getElementById('transcribe-btn').addEventListener('click', async () => 
     }
 
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || 'Sunucu hatası')
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Sunucu hatası (' + res.status + ')')
     transcriptData = data
     document.getElementById('lang-badge').textContent =
       `${data.language.toUpperCase()} · %${Math.round((data.language_probability || 1) * 100)}`
     renderTranscript()
-    statusEl.style.display = 'none'
+    if (session && data.saved === false) {
+      statusBox.className = 'status-box error'
+      statusBox.textContent = '⚠️ Transkript hazır, ancak arşivinize kaydedilemedi. Metni kopyalayıp indirmeyi unutmayın.'
+    } else {
+      statusEl.style.display = 'none'
+    }
     document.getElementById('result').style.display = 'block'
     document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   } catch (err) {
     statusBox.className = 'status-box error'
-    statusBox.innerHTML = `<span>❌ ${err.message}</span>`
+    statusBox.textContent = "❌ " + err.message
   } finally {
     btn.disabled = false
   }
@@ -539,7 +544,7 @@ async function loadReport() {
       })
     })
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || 'Özetleme başarısız')
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Özetleme başarısız')
     currentReport = { ...currentReport, ...data }
     renderReport(data)
   } catch (err) {

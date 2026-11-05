@@ -6,8 +6,8 @@
 <title>Arşiv — Transkript Aracı</title>
 <script src="/static/theme.js"></script>
 <link rel="stylesheet" href="/static/style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 <style>
   /* ── Toolbar ───────────────────── */
   .toolbar { display:flex; gap:.65rem; flex-wrap:wrap; margin-bottom:1rem; }
@@ -286,7 +286,7 @@ function render(list) {
             <input class="fn-input" data-id="${t.id}" value="${esc(t.filename)}">
           </div>
           <div class="card-info">
-            <span class="badge badge-accent">${(t.language||'').toUpperCase()}</span>
+            <span class="badge badge-accent">${esc((t.language||'').toUpperCase())}</span>
             <span class="c-date">${fmtDate(t.created_at)}</span>
             ${dur ? `<span class="c-dur">· ${dur}</span>` : ''}
           </div>
@@ -527,7 +527,7 @@ async function loadReport(id) {
       body: JSON.stringify({ transcript_id: id })
     })
     const data = await res.json()
-    if (!res.ok) throw new Error(data.detail || 'Özetleme başarısız')
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Özetleme başarısız')
     currentReport = { ...currentReport, ...data }
     renderReport(data)
   } catch (err) {

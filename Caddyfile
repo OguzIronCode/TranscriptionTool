@@ -1,0 +1,18 @@
+# DOMAIN .env dosyasından gelir (örn. transkript.example.com). HTTPS sertifikası otomatik alınır.
+{$DOMAIN} {
+	encode gzip
+
+	# Yükleme sınırı uygulamadaki 500 MB ile aynı
+	request_body {
+		max_size 500MB
+	}
+
+	reverse_proxy app:8000 {
+		# Uzun transkripsiyon işlemlerinde bağlantı kopmasın
+		transport http {
+			response_header_timeout 15m
+			read_timeout 15m
+			write_timeout 15m
+		}
+	}
+}
